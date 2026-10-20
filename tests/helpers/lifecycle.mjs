@@ -2,11 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tmpProject } from './tmp.mjs';
 import { git, gitInit, head, ok, record, register } from './repo.mjs';
 
 // A fresh git repo with a local identity, `ril init` already run (optionally with a fix-round cap) and one commit.
-export function withProject(fn, { cap } = {}) {
+// The caller calls cleanup().
+export function makeProject({ cap } = {}) {
   const p = tmpProject();
   try {
     gitInit(p.dir);
@@ -14,6 +17,16 @@ export function withProject(fn, { cap } = {}) {
     fs.writeFileSync(path.join(p.dir, 'README.md'), '# demo\n');
     git(p.dir, 'add', '-A');
     git(p.dir, 'commit', '-q', '-m', 'start');
+  } catch (err) {
+    p.cleanup();
+    throw err;
+  }
+  return p;
+}
+
+export function withProject(fn, opts) {
+  const p = makeProject(opts);
+  try {
     return fn(p.dir);
   } finally {
     p.cleanup();
@@ -45,13 +58,13 @@ export const writeFinalReport = (dir) => writeDoc(dir, 'reports/final.md', '# Fi
 
 // Everything before the proofs: scenarios, feature maps, stages up to accept, a verifier V1, a trusted kit,
 // the final report, and one saved version that holds it all.
-export function ready(dir, ids = ['S1', 'S2'], { stages = ['design', 'confirm', 'build', 'accept'] } = {}) {
+export function ready(dir, ids = ['S1', 'S2'], { stages = ['design', 'confirm', 'build', 'accept'], report = true } = {}) {
   importScenarios(dir, ids);
   writeFeatureMaps(dir, ids);
   advance(dir, ['shape', ...stages]);
   register(dir, 'V1', 'verifier');
   trustKit(dir);
-  writeFinalReport(dir);
+  if (report) writeFinalReport(dir);
   ok(dir, 'checkpoint');
 }
 
@@ -69,4 +82,12 @@ export function buildProject(dir, ids = ['S1', 'S2']) {
   prove(dir, ids);
   ok(dir, 'agent', 'set', 'V1', '--state', 'done', '--result', 'every scenario proven');
   ok(dir, 'stage', 'set', 'done');
+}
+
+const checker = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'e2e', 'check-state.mjs');
+
+// Runs the end-to-end state checker on a project folder.
+export function runChecker(dir) {
+  const r = spawnSync(process.execPath, [checker, dir], { encoding: 'utf8' });
+  return { code: r.status, text: r.stdout + r.stderr, problems: r.stdout.split('\n').filter((l) => l.startsWith('PROBLEM: ')) };
 }

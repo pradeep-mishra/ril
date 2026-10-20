@@ -8,7 +8,7 @@ import { load, mutate, statePath } from '../lib/store.mjs';
 import { addScenario, fails, head, ok, record, register, status, writeBrief } from './helpers/repo.mjs';
 import { ril } from './helpers/ril.mjs';
 import { stateFiles } from './helpers/recovery.mjs';
-import { advance, importScenarios, prove, ready, trustKit, withProject, writeDoc, writeFeatureMaps, writeFinalReport } from './helpers/lifecycle.mjs';
+import { advance, importScenarios, prove, ready, runChecker, trustKit, withProject, writeDoc, writeFeatureMaps, writeFinalReport } from './helpers/lifecycle.mjs';
 
 const IDS = ['S1', 'S2'];
 const BUILD = ['design', 'confirm', 'build'];
@@ -43,6 +43,7 @@ test('happy path: from the idea to done, step by step', () => {
 
     const full = ok(dir, 'status', '--full').stdout;
     assert.match(full, /Done: 2 of 2 scenarios proven/);
+    for (const id of IDS) assert.match(full, new RegExp(`^  ${id}  Scenario ${id} - `, 'm'));
     const summary = ok(dir, 'ledger', 'summary').stdout;
     const list = ok(dir, 'scenario', 'list').stdout;
     for (const id of IDS) {
@@ -173,6 +174,25 @@ test('stale path: after a docs-only change the pass is carried and done goes thr
     assert.equal(rows(dir, b).length, 2);
     ok(dir, 'stage', 'set', 'done');
     assert.equal(load(dir).stage, 'done');
+  });
+});
+
+test('real accept order: proofs first, then the report and README, then the passes are carried', () => {
+  withProject((dir) => {
+    ready(dir, IDS, { report: false });
+    prove(dir, IDS);
+    const a = head(dir);
+    writeFinalReport(dir);
+    fs.writeFileSync(path.join(dir, 'README.md'), '# demo\n\nHow to use it.\n');
+    ok(dir, 'checkpoint');
+    const b = head(dir);
+    assert.notEqual(a, b);
+    fails(dir, 1, 'stage', 'set', 'done'); // the proofs are one version behind
+    for (const id of IDS) ok(dir, 'ledger', 'carry', id, a, b);
+    ok(dir, 'agent', 'set', 'V1', '--state', 'done', '--result', 'both proven');
+    ok(dir, 'stage', 'set', 'done');
+    const checked = runChecker(dir);
+    assert.equal(checked.code, 0, checked.text);
   });
 });
 

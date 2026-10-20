@@ -15,11 +15,11 @@ Step 3 is automated. This runbook is how milestone 1 is accepted.
 
 ## 2. The kill-and-resume drill (manual)
 
-1. While the build is running (stage `build`), run `ril ledger summary` in the project folder and keep the output.
+1. While the build is running (stage `build`), run `ril ledger summary` in the project folder and keep the output. If bare `ril` is not on your PATH yet, run `<repo>/bin/ril ledger summary` instead (`<repo>\bin\ril.cmd ledger summary` on Windows).
 2. Stop the session: close the terminal window. Do not wait for it to finish.
 3. Open a new terminal in the same folder and start `claude --plugin-dir <path to this repo>` again.
 4. Type `/ril`. It should say what happened and carry on from where it was.
-5. Run `ril ledger summary` again and compare. A scenario that was `proven` before must still be `proven`, and its saved result must be unchanged, so it was not redone.
+5. Run the same `ledger summary` command again and compare. A scenario that was `proven` before must still be `proven`, and its saved result must be unchanged, so it was not redone.
 6. Let the run finish.
 
 ## 3. Check the result (automated)
@@ -30,6 +30,8 @@ each proof has a passing result on the current saved version, with real evidence
 a clean review (or accepted risks) and at least one check; the final report has a "What is not covered" section;
 the proof kit is trusted; nothing is unsaved; no agent is still working.
 It prints a short summary, including the decisions made and what recovery did.
+Exit codes: 0 accepted, 1 not accepted, 2 it cannot read the folder as a ril project.
+On `NOT ACCEPTED`, each `PROBLEM:` line names one thing to fix. Fix it with `/ril` or by hand, run the checker again, and log each problem in step 4.
 
 ## 4. Record what happened
 
