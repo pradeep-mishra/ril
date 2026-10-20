@@ -20,10 +20,10 @@ export function addUnit(dir, id, state = 'doing') {
   mutate(dir, (s) => s.units.push({ id, kind: 'task', parent: null, title: `Task ${id}`, state, checkpoint: null, updated: minutesAgo(1) }));
 }
 
-export function writeReport(dir, id) {
+export function writeReport(dir, id, text = '# Report\nSTATUS: done\n') {
   const file = path.join(dir, '.ril', 'agents', id, 'report.md');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, 'STATUS: done\n');
+  fs.writeFileSync(file, text);
 }
 
 // The id of a process that has already exited.
@@ -31,12 +31,33 @@ export function deadPid() {
   return spawnSync(process.execPath, ['-e', '']).pid;
 }
 
-// Starts a real child that keeps changing the state, and kills it without warning after `ms`.
-export function killMidWrite(dir, ms) {
+// Starts a real child that keeps changing the state. Once it has saved one change (it writes `marker`),
+// waits a random 0 to 300 ms and kills it without warning. Resolves when the child is gone.
+export function killMidWrite(dir, marker, { startMs = 30_000 } = {}) {
+  fs.rmSync(marker, { force: true });
   return new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, [child, dir, 'mutate', '1000000', 'kill'], { stdio: 'ignore' });
-    p.on('error', reject);
-    p.on('exit', () => resolve());
-    setTimeout(() => p.kill('SIGKILL'), ms);
+    const p = spawn(process.execPath, [child, dir, 'mutate', '1000000', 'kill', marker], { stdio: 'ignore' });
+    let timer;
+    const deadline = Date.now() + startMs;
+    const watch = setInterval(() => {
+      if (fs.existsSync(marker)) {
+        clearInterval(watch);
+        timer = setTimeout(() => p.kill('SIGKILL'), Math.floor(Math.random() * 301));
+      } else if (Date.now() > deadline) {
+        clearInterval(watch);
+        p.kill('SIGKILL');
+        reject(new Error('the child never saved a change'));
+      }
+    }, 5);
+    p.on('error', (err) => {
+      clearInterval(watch);
+      reject(err);
+    });
+    p.on('exit', () => {
+      clearInterval(watch);
+      clearTimeout(timer);
+      if (fs.existsSync(marker)) resolve();
+      else reject(new Error('the child stopped before it saved a change'));
+    });
   });
 }
