@@ -128,7 +128,8 @@ test('ril-control keeps the retry, parallel and always-a-result rules', () => {
   assert.match(body, /Retry by how it failed: a cap hit or out-of-memory gets a smaller scope/);
   assert.match(body, /after two retries park the unit and replan around it/);
   assert.match(body, /Tasks run in parallel only when their `touch` sets are disjoint/);
-  assert.match(body, /merge one at a time and run the tests after each merge/);
+  assert.match(body, /Tasks run in parallel only when their `touch` sets are disjoint, otherwise one at a time\./);
+  assert.ok(!body.includes('worktree'), 'ril-control names no worktrees');
   assert.match(body, /--state done --result "/);
   assert.match(body, /--state failed --result "/);
   assert.match(body, /`ril root`/);
@@ -449,7 +450,7 @@ test('ril-build: tasks file, a pilot first, tester then implementer, honest test
   const review = at(body, '`ril-review`');
   assert.ok(review < body.lastIndexOf('`ril-verify`'), 'review before verification');
   assert.match(body, /pilot[^\n]*before any other task starts/);
-  assert.match(body, /T1[^\n]*`Files:`[^\n]*`\.gitignore`[^\n]*node_modules/);
+  assert.match(body, /T1[^\n]*tester[^\n]*`\.gitignore`[^\n]*node_modules/);
   for (const cmd of ['unit', 'agent', 'checkpoint', 'progress']) assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
 });
 
@@ -484,12 +485,12 @@ test('ril-verify accept mode: fresh verifier, traceability, scans, guide, final 
   has(accept, ['`git grep', 'audit'], file);
 });
 
-const PROTECTED_CHECK = /`git log [^`]*-- <Protected paths>`[^\n]*`Tester version/;
+const PROTECTED_CHECK = /newest `Tester version` checkpoint stored on a task unit[^\n]*`git diff --name-only <newest tester version> <[^>]+> -- <Protected paths>` is empty/;
 
 test('protected set: acceptance tests and the verify entries only; kit documents follow touch', () => {
   for (const name of LAST_SKILLS) assert.doesNotMatch(readSkill(name).body, /`Protected:`[^\n]{0,80}\.ril\/docs\/verification/, name);
   const recipe = readSkill('ril-recipe').body;
-  has(recipe, ['tests/acceptance/', '`scripts.verify` and `scripts.test`'], 'ril-recipe');
+  has(recipe, ['tests/acceptance/', '`scripts.verify`', '`scripts.test`'], 'ril-recipe');
   assert.match(recipe, /kit documents[^\n]*only by an author or verifier whose brief lists them in `touch`/i);
   const build = readSkill('ril-build').body;
   assert.match(build, /dependencies and `bin`[^\n]*implementer/);
@@ -528,7 +529,9 @@ test('ril-verify: review per scenario, untrusted kit, one batch per round, no co
 
 test('ril-review: accepted risks carry each affected scenario id, never a plan id', () => {
   const { body } = readSkill('ril-review');
-  assert.match(body, /built code and the running program[^\n]*id of each scenario it affects[^\n]*never a plan id/);
+  assert.match(body, /built code and the running program[^\n]*one decision per affected scenario[^\n]*never a plan id/);
+  assert.match(body, /`ril decision log --stage <stage> --decision "Accepted risk for S2: <finding>" --why "<reason>"`/);
+  for (const name of ['ril-review', 'ril-verify', 'ril-build']) assert.ok(!readSkill(name).body.includes('each scenario it affects'), `${name} keeps single-decision wording`);
   assert.match(body, /must-fix names the scenario ids it affects/);
 });
 
@@ -555,4 +558,41 @@ test('author role covers every document authors write, from its goal and touch',
   const r = readRole('author');
   has(r.frontmatter.description, ['verify.md', 'feature map', 'README', 'how-to', 'final report', 'tasks', 'brief'], r.file);
   assert.match(r.body, /`goal`[^\n]*`touch`/);
+});
+
+test('protected check: bounded by the newest tester version, restored only by a tester', () => {
+  const build = readSkill('ril-build').body;
+  const verify = readSkill('ril-verify').body;
+  for (const [name, body] of [['ril-build', build], ['ril-verify', verify]]) {
+    assert.match(body, /a later tester version resets the baseline/, name);
+    assert.match(body, /`Protected:` (?:must-fix|violation)[^\n]*fresh `tester`[^\n]*never a fixer[^\n]*new `Tester version` checkpoint[^\n]*task unit/, name);
+  }
+  assert.doesNotMatch(build + verify, /`git log [^`]*<Protected paths>`/, 'no unbounded history check');
+  assert.match(build, /`ril unit list --kind task --json`/);
+});
+
+test('protected set also covers the lifecycle scripts; T1 tester writes the .gitignore; implementer sees verify.md', () => {
+  const prot = readFile('templates/verify.md').text.split('\n').find((l) => l.startsWith('Protected: '));
+  for (const k of ['scripts.preverify', 'scripts.postverify', 'scripts.pretest', 'scripts.posttest']) {
+    assert.ok(prot.includes(k), `template Protected lacks ${k}`);
+    for (const name of ['ril-recipe', 'ril-build']) assert.ok(readSkill(name).body.includes(`\`${k}\``), `${name} lacks ${k}`);
+  }
+  const build = readSkill('ril-build').body;
+  assert.match(build, /tester[^\n]*`touch`[^\n]*for T1 also `package\.json` and the project `\.gitignore`/);
+  assert.match(build, /implementer[^\n]*`inputs`[^\n]*`<project>\/\.ril\/docs\/verification\/verify\.md`/);
+  const outcome = build.slice(0, build.indexOf('## Rules'));
+  assert.ok(!outcome.includes('proof kit'), 'the outcome names the protected entries, not the proof kit');
+  assert.match(outcome, /acceptance tests and the verify command/);
+});
+
+test('ril-recipe: the author acceptance list is whole; kit documents rule is its own paragraph', () => {
+  const { body } = readSkill('ril-recipe');
+  const who = body.slice(body.indexOf('**Who writes the kit.**'), body.indexOf('**Kit documents**'));
+  has(who, ['`## Self-run`', 'labelled measured, inferred or guess'], 'author acceptance');
+  assert.match(body, /\n\n\*\*Kit documents\*\*/);
+  assert.match(body, /regression in an earlier plan's scenario[^\n]*back to `ril-build` for plan/);
+});
+
+test('ril-verify: fix-loop verifiers also cover a regressed earlier scenario', () => {
+  assert.match(readSkill('ril-verify').body, /one fresh verifier per scenario of the plan and per regressed scenario from the drift check/);
 });

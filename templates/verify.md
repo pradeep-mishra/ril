@@ -1,5 +1,5 @@
 Trusted: no
-Protected: tests/acceptance/, <the verify command's script file, for example scripts/verify.mjs>, package.json scripts.verify, package.json scripts.test
+Protected: tests/acceptance/, <the verify command's script file, for example scripts/verify.mjs>, package.json scripts.verify, scripts.test, scripts.preverify, scripts.postverify, scripts.pretest, scripts.posttest
 <!-- Proof kit, saved as .ril/docs/verification/verify.md. Keep the first two lines first. Protected entries are changed by a tester only; implementers and fixers never edit them. This file and the feature maps are changed only by an author or verifier whose brief lists them in touch. Delete this line. -->
 # Proof kit: <project name>
 
