@@ -1,106 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
 import { load } from '../lib/store.mjs';
-
-// Children inherit this: a fixed identity and no commit signing, whatever the machine's own git settings are.
-Object.assign(process.env, {
-  GIT_AUTHOR_NAME: 'Ril Test',
-  GIT_AUTHOR_EMAIL: 'ril-test@example.com',
-  GIT_COMMITTER_NAME: 'Ril Test',
-  GIT_COMMITTER_EMAIL: 'ril-test@example.com',
-  GIT_CONFIG_COUNT: '2',
-  GIT_CONFIG_KEY_0: 'commit.gpgsign',
-  GIT_CONFIG_VALUE_0: 'false',
-  GIT_CONFIG_KEY_1: 'core.autocrlf',
-  GIT_CONFIG_VALUE_1: 'false',
-});
-
-const fixture = (name) => path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', name);
-const git = (dir, ...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const lines = (text) => text.split('\n').filter(Boolean);
-
-function ok(dir, ...args) {
-  const r = ril(dir, ...args);
-  assert.equal(r.code, 0, `${args.join(' ')} -> ${r.stdout}${r.stderr}`);
-  return r;
-}
-
-function fails(dir, code, ...args) {
-  const r = ril(dir, ...args);
-  assert.equal(r.code, code, `${args.join(' ')} -> ${r.stdout}${r.stderr}`);
-  assert.match(r.stderr, /Next: /, `${args.join(' ')} has no Next line`);
-  return r;
-}
-
-// An initialised project inside a git repo with a local identity and one commit.
-function withRepo(fn, { gitInit = true } = {}) {
-  const p = tmpProject();
-  try {
-    if (gitInit) {
-      git(p.dir, 'init', '-q');
-      git(p.dir, 'config', 'user.name', 'Ril Test');
-      git(p.dir, 'config', 'user.email', 'ril-test@example.com');
-    }
-    ok(p.dir, 'init');
-    if (gitInit) {
-      fs.writeFileSync(path.join(p.dir, 'README.md'), '# demo\n');
-      git(p.dir, 'add', '-A');
-      git(p.dir, 'commit', '-q', '-m', 'start');
-    }
-    return fn(p.dir);
-  } finally {
-    p.cleanup();
-  }
-}
-
-const head = (dir) => git(dir, 'rev-parse', 'HEAD');
-
-function commitFile(dir, rel, text) {
-  fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-  fs.writeFileSync(path.join(dir, rel), text);
-  git(dir, 'add', '-A');
-  git(dir, 'commit', '-q', '-m', `change ${rel}`);
-  return head(dir);
-}
-
-function evidence(dir, id = 'S1') {
-  const rel = `.ril/evidence/${id}/run.txt`;
-  fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
-  fs.writeFileSync(path.join(dir, rel), 'transcript\n');
-  return rel;
-}
-
-const addScenario = (dir, id = 'S1', method = 'cli') =>
-  ok(dir, 'scenario', 'add', id, '--title', `Title ${id}`, '--method', method, '--criterion', `Criterion ${id}`);
-
-const register = (dir, id, role, brief = fixture('agent-brief-good.md')) => {
-  const file = role === 'verifier' ? brief : writeBrief(dir, role);
-  return ok(dir, 'agent', 'register', id, '--role', role, '--task', `${role} work`, '--brief', file);
-};
-
-function writeBrief(dir, role, edit = (t) => t) {
-  const file = path.join(dir, `brief-${role}.md`);
-  fs.writeFileSync(file, edit(fs.readFileSync(fixture('agent-brief-good.md'), 'utf8').replace('role: verifier', `role: ${role}`)));
-  return file;
-}
-
-const record = (dir, scenario, checkpoint, verdict, extra = {}) => {
-  const opts = { evidence: evidence(dir, scenario), verifier: 'V1', review: 'clean', checks: '3', ...extra };
-  const args = ['ledger', 'record', scenario, checkpoint, verdict];
-  for (const [k, v] of Object.entries(opts)) if (v !== null) args.push(`--${k}`, v);
-  return ril(dir, ...args);
-};
-
-const status = (dir, id = 'S1') => load(dir).scenarios.find((s) => s.id === id).status;
+import { addScenario, commitFile, evidence, fails, fixture, git, head, lines, ok, record, register, status, withRepo, writeBrief } from './helpers/repo.mjs';
 
 test('register refuses unknown role and incomplete brief', () => {
   withRepo((dir) => {
+    addScenario(dir, 'S1');
     fails(dir, 1, 'agent', 'register', 'X1', '--role', 'boss', '--task', 't', '--brief', fixture('agent-brief-good.md'));
 
     const bad = fails(dir, 6, 'agent', 'register', 'V9', '--role', 'verifier', '--task', 'verify S1', '--brief', fixture('agent-brief-bad.md'));
@@ -113,8 +21,11 @@ test('register refuses unknown role and incomplete brief', () => {
 
     const mismatch = fails(dir, 6, 'agent', 'register', 'V9', '--role', 'tester', '--task', 't', '--brief', fixture('agent-brief-good.md'));
     assert.match(mismatch.stderr, /role/);
-    const long = writeBrief(dir, 'verifier', (t) => `${t}${'- Stop again.\n'.repeat(50)}`);
-    assert.match(fails(dir, 6, 'agent', 'register', 'V9', '--role', 'verifier', '--task', 't', '--brief', long).stderr, /60 lines/);
+    const lineCount = fs.readFileSync(fixture('agent-brief-good.md'), 'utf8').split('\n').length - 1;
+    const exactly = (n) => writeBrief(dir, 'verifier', (t) => `${t}${'- Stop again.\n'.repeat(n - lineCount)}`);
+    const long = fails(dir, 6, 'agent', 'register', 'V9', '--role', 'verifier', '--task', 't', '--brief', exactly(61));
+    assert.match(long.stderr, /61 lines.*60 lines/);
+    assert.equal(lines(long.stderr).length, 2, 'only the length problem');
     const relRules = writeBrief(dir, 'verifier', (t) => t.replace('- /opt/ril/principles.md', '- principles.md'));
     assert.match(fails(dir, 6, 'agent', 'register', 'V9', '--role', 'verifier', '--task', 't', '--brief', relRules).stderr, /rules/);
     fails(dir, 2, 'agent', 'register', 'V9', '--role', 'verifier', '--task', 't', '--brief', path.join(dir, 'nope.md'));
@@ -186,7 +97,7 @@ test('rail 1 table', () => {
 
     // risks is accepted once a decision about the scenario is on record.
     addScenario(dir, 'S2', 'cli');
-    ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'Accept the slow start-up risk for S2', '--why', 'the person agreed');
+    ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'Accepted risk for S2: slow start-up', '--why', 'the person agreed');
     assert.equal(record(dir, 'S2', now, 'proven-cli', { review: 'risks' }).code, 0);
     assert.equal(status(dir, 'S2'), 'proven');
 
@@ -306,7 +217,7 @@ test('rail 2', () => {
     raw.decisions = [];
     fs.writeFileSync(path.join(dir, '.ril', 'state.json'), JSON.stringify(raw));
     assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /S1/, 'parked without a decision is refused');
-    ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Accept S1 as unproven', '--why', 'the payment sandbox is down');
+    ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Accepted as unproven: S1', '--why', 'the payment sandbox is down');
     ok(dir, 'stage', 'set', 'done');
   });
 });
