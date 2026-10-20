@@ -74,6 +74,9 @@ test('a self-run covers the kit content it saw: a changed body or feature map ne
     assert.equal(proof().code, 0);
     fs.writeFileSync(kit, fs.readFileSync(kit, 'utf8').replace('Trusted: yes', 'Trusted:   yes'));
     assert.equal(proof().code, 0, 'the first line is not part of what the self-run saw');
+    fs.writeFileSync(path.join(kit, '..', '.DS_Store'), 'finder');
+    fs.symlinkSync('nowhere', path.join(kit, '..', 'dangling'));
+    assert.equal(proof().code, 0, 'a dotfile and a dangling link are not part of the kit');
     for (const [what, change] of [['the body', () => fs.appendFileSync(kit, 'a weaker check\n')], ['a feature map', () => fs.mkdirSync(path.join(kit, '..', 'feature-map')) || fs.writeFileSync(path.join(kit, '..', 'feature-map', 'S1.md'), 'Method: cli\n')]]) {
       change();
       assert.match(proof().stderr, /kit changed after its self-run/, what);
