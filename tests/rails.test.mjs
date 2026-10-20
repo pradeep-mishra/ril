@@ -171,39 +171,6 @@ test('failed then proven', () => {
   });
 });
 
-test('carry', () => {
-  withRepo((dir) => {
-    addScenario(dir);
-    register(dir, 'V1', 'verifier');
-    trustKit(dir);
-    const first = head(dir);
-    assert.equal(record(dir, 'S1', first, 'proven-cli').code, 0);
-
-    const docs = commitFile(dir, 'README.md', '# demo\n\nMore words.\n');
-    fails(dir, 2, 'ledger', 'check', 'S1', docs);
-    const carried = ok(dir, 'ledger', 'carry', 'S1', first.slice(0, 7), docs);
-    assert.doesNotMatch(carried.stdout, /\bSHA\b|\bHEAD\b/);
-    ok(dir, 'ledger', 'check', 'S1', docs);
-    const state = load(dir);
-    assert.equal(state.ledger.length, 2);
-    assert.equal(state.ledger[1].checkpoint, docs);
-    assert.equal(state.ledger[1].checks, 3);
-    assert.ok(state.decisions.some((d) => d.decision.includes('S1')), 'carry logs a decision');
-
-    const code = commitFile(dir, 'src/a.js', 'console.log(1)\n');
-    const r = fails(dir, 2, 'ledger', 'carry', 'S1', docs, code);
-    assert.match(r.stderr, /NOT-TRIVIAL/);
-    assert.match(r.stderr, /src\/a\.js/);
-    fails(dir, 2, 'ledger', 'check', 'S1', code);
-    assert.equal(load(dir).ledger.length, 2);
-
-    // Tests and .ril files are trivial too; carrying needs a pass to carry.
-    const tests = commitFile(dir, 'tests/a.test.js', 'test\n');
-    assert.match(fails(dir, 2, 'ledger', 'carry', 'S1', code, tests).stderr, /NOT-VERIFIED/);
-    fails(dir, 2, 'ledger', 'carry', 'S1', 'fffffff', tests);
-  });
-});
-
 test('rail 2', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
@@ -273,10 +240,16 @@ test('checkpoint', () => {
     assert.ok(head(dir).startsWith(id));
     const files = lines(git(dir, 'ls-files'));
     assert.ok(files.includes('app.js'));
-    assert.ok(files.includes('.ril/docs/x.md'));
-    assert.ok(files.includes('.ril/.gitignore'));
-    assert.ok(!files.includes('.ril/state.json'));
-    assert.ok(!files.some((f) => f.startsWith('.ril/evidence') || f === '.ril/log.md'));
+    assert.ok(!files.some((f) => f.startsWith('.ril/')), `.ril is never saved: ${files}`);
+    assert.ok(lines(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8')).includes('.ril/'));
+
+    // Documents, evidence and state change nothing: the saved version stays the same.
+    fs.writeFileSync(path.join(dir, '.ril', 'docs', 'y.md'), 'more\n');
+    fs.mkdirSync(path.join(dir, '.ril', 'evidence', 'S1'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.ril', 'evidence', 'S1', 'run.txt'), 'out\n');
+    ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'x', '--why', 'y');
+    assert.equal(git(dir, 'status', '--porcelain'), '');
+    assert.equal(ok(dir, 'checkpoint').stdout.trim(), id);
     assert.equal(git(dir, 'log', '-1', '--format=%s'), 'first save');
 
     // Nothing new to save: the same version comes back.

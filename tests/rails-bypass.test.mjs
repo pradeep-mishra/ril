@@ -37,15 +37,8 @@ test('only an "Accepted risk for <id>" decision lets risks through', () => {
     ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'Accepted risk for S10: slow', '--why', 'agreed');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli', { review: 'risks' }).code, 1, 'another id does not count');
 
-    // A carry decision names the scenario too, and does not count either.
-    assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
-    const from = head(dir);
-    const to = commitFile(dir, 'README.md', '# more\n');
-    ok(dir, 'ledger', 'carry', 'S1', from, to);
-    assert.equal(record(dir, 'S1', to, 'proven-cli', { review: 'risks' }).code, 1, 'a carry decision is not risk acceptance');
-
     ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'accepted RISK for S1: slow start', '--why', 'the person agreed');
-    assert.equal(record(dir, 'S1', to, 'proven-cli', { review: 'risks' }).code, 0);
+    assert.equal(record(dir, 'S1', head(dir), 'proven-cli', { review: 'risks' }).code, 0);
   });
 });
 
@@ -77,14 +70,10 @@ test('done needs every proof at the current saved version', () => {
     commitFile(dir, 'src/a.js', 'code\n');
     const stale = fails(dir, 1, 'stage', 'set', 'done');
     assert.match(stale.stderr, /S1/);
-    assert.match(stale.stderr, /ledger carry/);
     assert.doesNotMatch(stale.stderr, /\bSHA\b|\bHEAD\b/);
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
-    const proved = head(dir);
-    const docs = commitFile(dir, 'docs/guide.md', 'words\n');
+    commitFile(dir, 'docs/guide.md', 'words\n');
     fails(dir, 1, 'stage', 'set', 'done');
-    ok(dir, 'ledger', 'carry', 'S1', proved, docs);
-    ok(dir, 'stage', 'set', 'done');
   });
 });
 
@@ -173,7 +162,7 @@ test('evidence must be a non-empty file under .ril/evidence', () => {
         'a missing file': '.ril/evidence/S1/none.txt',
         'a product file': 'README.md',
         'a product file by its full path': path.join(dir, 'README.md'),
-        'a ril file outside the evidence folder': '.ril/.gitignore',
+        'a ril file outside the evidence folder': '.ril/log.md',
         'the evidence folder itself': '.ril/evidence',
         'an escape from the evidence folder': '.ril/evidence/../../README.md',
       };
@@ -237,64 +226,6 @@ test('a verifier that failed or was stopped cannot record', () => {
   });
 });
 
-test('carry is strict about what counts as a trivial change', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'S1');
-    addScenario(dir, 'G1', 'golden');
-    register(dir, 'V1', 'verifier');
-    trustKit(dir);
-    const base = head(dir);
-    assert.equal(record(dir, 'S1', base, 'proven-cli').code, 0);
-    assert.equal(record(dir, 'G1', base, 'proven-golden').code, 0);
-
-    const notTrivial = (rel) => {
-      git(dir, 'checkout', '-q', base);
-      const to = commitFile(dir, rel, 'x\n');
-      const r = fails(dir, 2, 'ledger', 'carry', 'S1', base, to);
-      assert.match(r.stderr, /NOT-TRIVIAL/, rel);
-    };
-    notTrivial('src/tests/helper.js');
-    notTrivial('src/docs/page.js');
-    notTrivial('src/README.md');
-    notTrivial('src/a-spec.js');
-    notTrivial('src/test_a.py');
-
-    git(dir, 'checkout', '-q', base);
-    const tests = commitFile(dir, 'tests/golden.json', '{}\n');
-    ok(dir, 'ledger', 'carry', 'S1', base, tests);
-    assert.match(fails(dir, 2, 'ledger', 'carry', 'G1', base, tests).stderr, /NOT-TRIVIAL/, 'tests are the golden set');
-    const spec = commitFile(dir, 'src/a.spec.js', 'x\n');
-    ok(dir, 'ledger', 'carry', 'S1', tests, spec);
-
-    // Backwards (to an older version) is refused.
-    fails(dir, 1, 'ledger', 'carry', 'S1', spec, base);
-  });
-});
-
-test('carry sees changes outside the project folder in an enclosing repo, whatever diff.relative says', () => {
-  for (const relative of ['false', 'true']) {
-    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outer-'));
-    try {
-      gitInit(outer);
-      git(outer, 'config', 'diff.relative', relative);
-      const dir = path.join(outer, 'app');
-      fs.mkdirSync(dir);
-      ok(dir, 'init');
-      addScenario(dir, 'S1');
-      register(dir, 'V1', 'verifier');
-      const from = ok(dir, 'checkpoint').stdout.trim();
-      trustKit(dir);
-      assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
-      fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
-      git(outer, 'add', 'shared.js');
-      git(outer, 'commit', '-q', '-m', 'outside change');
-      assert.match(fails(dir, 2, 'ledger', 'carry', 'S1', from, head(outer)).stderr, /shared\.js/, relative);
-    } finally {
-      fs.rmSync(outer, { recursive: true, force: true });
-    }
-  }
-});
-
 test('record refuses while the project has unsaved changes', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
@@ -305,6 +236,6 @@ test('record refuses while the project has unsaved changes', () => {
     assert.equal(r.code, 1);
     assert.match(r.stderr, /ril checkpoint/);
     const saved = ok(dir, 'checkpoint').stdout.trim();
-    assert.equal(record(dir, 'S1', saved, 'proven-cli').code, 0, 'changes inside .ril do not count');
+    assert.equal(record(dir, 'S1', saved, 'proven-cli').code, 0, 'a saved version records the result');
   });
 });

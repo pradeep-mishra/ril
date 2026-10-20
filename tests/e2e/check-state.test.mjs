@@ -18,15 +18,6 @@ const edit = (dir, change) => {
 };
 const proofFile = (dir) => path.join(dir, '.ril', 'evidence', 'S1', 'run.txt');
 
-// Saves the folder after a change to tracked files; the passes are carried over (docs-only, so the CLI allows it),
-// so the change is the only thing wrong.
-function resave(dir) {
-  const a = head(dir);
-  ok(dir, 'checkpoint');
-  const b = head(dir);
-  if (a !== b) for (const id of IDS) ok(dir, 'ledger', 'carry', id, a, b);
-}
-
 let base;
 let scratch;
 before(() => {
@@ -105,10 +96,7 @@ test('a folder that is not a ril project, damaged state, or a wrong shape exits 
   }
 });
 
-const TRUST = (line) => (dir) => {
-  fs.writeFileSync(docs(dir, 'verification', 'verify.md'), `# Verify\n\n${line}\n`);
-  resave(dir);
-};
+const TRUST = (line) => (dir) => fs.writeFileSync(docs(dir, 'verification', 'verify.md'), `# Verify\n\n${line}\n`);
 const outsideFile = () => {
   const file = path.join(scratch, `outside-${Math.random().toString(36).slice(2)}.txt`);
   fs.writeFileSync(file, 'transcript kept elsewhere\n');
@@ -130,7 +118,6 @@ const variants = [
   ['the kit says Trusted: yes only on a later line', TRUST('Trusted: yes'), /Trusted: yes/],
   ['the kit is missing', (dir) => {
     fs.rmSync(docs(dir, 'verification', 'verify.md'));
-    resave(dir);
   }, /Trusted: yes/],
   ['every scenario is set aside and none is proven', (dir) => edit(dir, (s) => {
     for (const sc of s.scenarios) {
@@ -154,11 +141,9 @@ const variants = [
   ['the evidence is a product file', (dir) => edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').evidence = 'README.md')), /evidence for scenario S1.*outside \.ril\/evidence/],
   ['the final report is missing', (dir) => {
     fs.rmSync(docs(dir, 'reports', 'final.md'));
-    resave(dir);
   }, /final report .*missing/i],
   ['the final report has no "What is not covered" section', (dir) => {
     fs.writeFileSync(docs(dir, 'reports', 'final.md'), '# Final report\n\nAll good.\n');
-    resave(dir);
   }, /no "What is not covered" section/],
   ['there are no scenarios', (dir) => edit(dir, (s) => void (s.scenarios = [])), /no scenarios/],
 ];

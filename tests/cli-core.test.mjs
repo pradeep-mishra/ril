@@ -69,14 +69,13 @@ test('every command has name, summary, usage and run', () => {
   }
 });
 
-test('init creates state and ignore file', () => {
+test('init creates state, folders and the routing blocks', () => {
   withProject((dir) => {
     const state = JSON.parse(fs.readFileSync(statePath(dir), 'utf8'));
     assert.equal(state.version, 1);
     assert.equal(state.project, path.basename(dir));
     assert.equal(state.mode, 'autonomous');
     assert.equal(state.pluginRoot, repoRoot);
-    assert.equal(fs.readFileSync(path.join(dir, '.ril', '.gitignore'), 'utf8'), '*\n!docs/\n!docs/**\n!.gitignore\n');
     for (const d of ['docs', 'evidence', 'agents']) assert.ok(fs.statSync(path.join(dir, '.ril', d)).isDirectory(), d);
     assert.ok(fs.existsSync(path.join(dir, '.ril', 'log.md')));
     for (const f of ['CLAUDE.md', 'AGENTS.md']) {
@@ -85,18 +84,18 @@ test('init creates state and ignore file', () => {
   });
 });
 
-test('Finder and Explorer files are excluded by init in a repo, and by the first checkpoint otherwise, once', () => {
+test('.ril and Finder and Explorer files are excluded by init in a repo, and by the first checkpoint otherwise, once', () => {
   inFolder((dir) => {
     gitInit(dir);
     for (let i = 0; i < 2; i++) assert.equal(ril(dir, 'init').code, 0);
-    assert.deepEqual(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8').match(/^(\.DS_Store|Thumbs\.db)$/gm), ['.DS_Store', 'Thumbs.db']);
+    assert.deepEqual(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8').match(/^(\.ril\/|\.DS_Store|Thumbs\.db)$/gm), ['.ril/', '.DS_Store', 'Thumbs.db']);
   });
   inFolder((dir) => {
     assert.equal(ril(dir, 'init').code, 0);
     assert.ok(!fs.existsSync(path.join(dir, '.git')), 'init does not start a repository');
     for (const name of ['.DS_Store', 'Thumbs.db', 'app.txt']) fs.writeFileSync(path.join(dir, name), 'x');
     assert.equal(ril(dir, 'checkpoint').code, 0);
-    assert.equal(git(dir, 'ls-files', '--', '.DS_Store', 'Thumbs.db', 'app.txt'), 'app.txt');
+    assert.equal(git(dir, 'ls-files', '--', '.ril', '.DS_Store', 'Thumbs.db', 'app.txt'), 'app.txt');
   });
 });
 
@@ -160,17 +159,15 @@ test('init is idempotent', () => {
   });
 });
 
-test('init repairs the block, the ignore file and the plugin root', () => {
+test('init repairs the block, the folders and the plugin root', () => {
   withProject((dir) => {
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), `${START}\nwrong\n${END}\n`);
-    fs.writeFileSync(path.join(dir, '.ril', '.gitignore'), 'x\n');
     fs.rmSync(path.join(dir, '.ril', 'evidence'), { recursive: true });
     mutate(dir, (s) => {
       s.pluginRoot = '/somewhere/old';
     });
     assert.equal(ril(dir, 'init').code, 0);
     assert.equal(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8'), `${START}\n${LINE}\n${END}\n`);
-    assert.equal(fs.readFileSync(path.join(dir, '.ril', '.gitignore'), 'utf8'), '*\n!docs/\n!docs/**\n!.gitignore\n');
     assert.ok(fs.existsSync(path.join(dir, '.ril', 'evidence')));
     assert.equal(load(dir).pluginRoot, repoRoot);
   });

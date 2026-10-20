@@ -74,3 +74,5 @@ Every rule the R3 rewrite removed, where it was, and why. Reasons: duplicate, wo
 | Prove on the real artifact; simplest design; pointers, not pasted content; plain words | standing-rules 4-6, author role | Duplicate (principles) |
 | Write the report to `report.md` and reply with the same text | every role, ril-control step 4, 6 | Replaced: the reply is the report (I2) |
 | Whole-suite output saved as evidence by the implementer | implementer role | Wording-level (kept: runs the whole suite; rule 6 saves output) |
+| `ril ledger carry` and its trivial-path list (`.ril/`, top-level Markdown, test and doc folders, test files) | CLI (`lib/proof.mjs`, `ledger`), accept playbook | Replaced (R6, baseline I4 and the carry trouble): `.ril/` is git-ignored, so documents, evidence and state never change the saved version; any other change needs a new proof, and accept writes the README before the final verification |
+| Commit `.ril` documents with the product; `.ril/.gitignore` that tracked only `.ril/docs` | `ril init`, `ril checkpoint` | Replaced (R6): the repository's own exclude file lists `.ril/` |

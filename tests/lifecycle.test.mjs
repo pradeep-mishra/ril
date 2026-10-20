@@ -153,7 +153,7 @@ test('recovery path: a proof whose evidence was deleted is demoted, and done wai
   });
 });
 
-test('stale path: a product change after the proof makes done refuse, and carry does not help', () => {
+test('stale path: a product change after the proof makes done refuse until it is proven again', () => {
   withProject((dir) => {
     ready(dir, IDS);
     prove(dir, IDS);
@@ -164,47 +164,25 @@ test('stale path: a product change after the proof makes done refuse, and carry 
     const b = head(dir);
     assert.notEqual(a, b);
     assert.equal(ok(dir, 'doctor', '--fix', '--quiet').stdout, '', 'a later saved version is not a repair');
-    assert.deepEqual(load(dir).scenarios.map((s) => s.status), ['proven', 'proven'], 'only re-checking or carry moves the proof forward');
+    assert.deepEqual(load(dir).scenarios.map((s) => s.status), ['proven', 'proven'], 'only re-checking moves the proof forward');
     const refused = fails(dir, 1, 'stage', 'set', 'done');
     assert.match(refused.stderr, /older version/);
     assert.match(refused.stderr, /S1[\s\S]*S2/);
-    const carry = fails(dir, 2, 'ledger', 'carry', 'S1', a, b);
-    assert.match(carry.stderr, /NOT-TRIVIAL.*src\/app\.js/);
-    fails(dir, 1, 'stage', 'set', 'done');
     prove(dir, IDS); // a verifier checks the new version
     ok(dir, 'stage', 'set', 'done');
   });
 });
 
-test('stale path: after a docs-only change the pass is carried and done goes through', () => {
-  withProject((dir) => {
-    ready(dir, IDS);
-    prove(dir, IDS);
-    const a = head(dir);
-    fs.mkdirSync(path.join(dir, 'docs'));
-    fs.writeFileSync(path.join(dir, 'docs', 'guide.md'), 'How to use it.\n');
-    ok(dir, 'checkpoint');
-    const b = head(dir);
-    assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /older version/);
-    for (const id of IDS) ok(dir, 'ledger', 'carry', id, a, b);
-    assert.equal(rows(dir, b).length, 2);
-    ok(dir, 'stage', 'set', 'done');
-    assert.equal(load(dir).stage, 'done');
-  });
-});
-
-test('real accept order: proofs first, then the report and README, then the passes are carried', () => {
+test('real accept order: the README is saved before the proofs, the report after, and done goes through', () => {
   withProject((dir) => {
     ready(dir, IDS, { report: false });
-    prove(dir, IDS);
-    const a = head(dir);
-    writeFinalReport(dir);
     fs.writeFileSync(path.join(dir, 'README.md'), '# demo\n\nHow to use it.\n');
     ok(dir, 'checkpoint');
-    const b = head(dir);
-    assert.notEqual(a, b);
-    fails(dir, 1, 'stage', 'set', 'done'); // the proofs are one version behind
-    for (const id of IDS) ok(dir, 'ledger', 'carry', id, a, b);
+    prove(dir, IDS);
+    const proved = head(dir);
+    writeFinalReport(dir);
+    ok(dir, 'checkpoint');
+    assert.equal(head(dir), proved, 'the report is not part of the saved version');
     ok(dir, 'agent', 'set', 'V1', '--state', 'done', '--result', 'both proven');
     ok(dir, 'stage', 'set', 'done');
     const checked = runChecker(dir);
