@@ -1,0 +1,24 @@
+{
+  "name": "cli",
+  "type": "cli",
+  "requires": [
+    {
+      "name": "node",
+      "detect": "node --version",
+      "install": { "darwin": "brew install node", "win32": "winget install OpenJS.NodeJS.LTS", "linux": null },
+      "guide": "Node.js runs the project. Download the LTS version from nodejs.org, run the installer, then open a new terminal window and check that 'node --version' prints a number.",
+      "human": false
+    },
+    {
+      "name": "git",
+      "detect": "git --version",
+      "install": { "darwin": "brew install git", "win32": "winget install Git.Git", "linux": null },
+      "guide": "Git keeps the saved versions of the project. Download it from git-scm.com, run the installer with the default choices, then open a new terminal window and check that 'git --version' prints a number.",
+      "human": false
+    }
+  ],
+  "methods": { "cli": "proven-cli" },
+  "allowlist": {
+    "claude": ["Bash(node *)", "Bash(npm *)", "Bash(git *)", "Edit(.ril/**)"]
+  }
+}

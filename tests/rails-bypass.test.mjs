@@ -236,10 +236,10 @@ test('a verifier that failed or was stopped cannot record', () => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
     for (const state of ['failed', 'stopped']) {
-      ok(dir, 'agent', 'set', 'V1', '--state', state);
+      ok(dir, 'agent', 'set', 'V1', '--state', state, '--result', `it ${state}`);
       assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 1, state);
     }
-    ok(dir, 'agent', 'set', 'V1', '--state', 'done');
+    ok(dir, 'agent', 'set', 'V1', '--state', 'done', '--result', 'S1 checked');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
   });
 });

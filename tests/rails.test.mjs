@@ -42,7 +42,7 @@ test('register refuses unknown role and incomplete brief', () => {
     assert.equal(load(dir).agents[0].state, 'done');
     assert.equal(load(dir).agents[0].result, 'S1 proven');
     fails(dir, 1, 'agent', 'set', 'V1', '--state', 'asleep');
-    fails(dir, 2, 'agent', 'set', 'NOPE', '--state', 'done');
+    fails(dir, 2, 'agent', 'set', 'NOPE', '--state', 'done', '--result', 'finished');
     register(dir, 'T1', 'tester');
     assert.deepEqual(lines(ok(dir, 'agent', 'list', '--active').stdout).map((l) => l.split(/\s+/)[0]), ['T1']);
     assert.equal(lines(ok(dir, 'agent', 'list').stdout).length, 2);
@@ -262,4 +262,21 @@ test('record before anything is saved gives a plain error', () => {
     assert.match(r.stderr, /ril checkpoint/);
     assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
   }, { gitInit: false });
+});
+
+test('a done or failed agent must say what it did, so its unit is not held forever', () => {
+  withRepo((dir) => {
+    addScenario(dir, 'S1');
+    register(dir, 'V1', 'verifier');
+    for (const state of ['done', 'failed']) {
+      const r = fails(dir, 1, 'agent', 'set', 'V1', '--state', state);
+      assert.match(r.stderr, /--result/);
+      assert.equal(load(dir).agents[0].state, 'running', 'nothing changed');
+      fails(dir, 1, 'agent', 'set', 'V1', '--state', state, '--result', '  ');
+    }
+    ok(dir, 'agent', 'set', 'V1', '--state', 'stopped');
+    ok(dir, 'agent', 'set', 'V1', '--state', 'running');
+    ok(dir, 'agent', 'set', 'V1', '--state', 'failed', '--result', 'could not start the app');
+    assert.equal(load(dir).agents[0].result, 'could not start the app');
+  });
 });
