@@ -69,7 +69,7 @@ function project(dir, list) {
   tools(dir, list);
 }
 function approve(dir, text = (hash) => `Approved tools ${hash}`) {
-  const hash = ril(dir, 'allowlist', 'hash').stdout.trim();
+  const hash = loadTools(dir).hash;
   assert.equal(ril(dir, 'decision', 'log', '--stage', 'design', '--decision', text(hash), '--why', 'the person said yes').code, 0);
   return hash;
 }
@@ -283,7 +283,7 @@ test('allowlist --approved refuses without an approval, with an edited list, wit
     project(dir, LIST);
     const none = fails(dir, 1, 'allowlist', 'write', ...APPROVED);
     assert.match(none.stderr, /has not approved/);
-    assert.match(none.stderr, new RegExp(`Approved tools ${ril(dir, 'allowlist', 'hash').stdout.trim()}`), 'the Next line names the decision to record');
+    assert.match(none.stderr, new RegExp(`Approved tools ${loadTools(dir).hash}`), 'the Next line names the decision to record');
     fails(dir, 1, '--force', 'trust me', 'allowlist', 'write', ...APPROVED);
     approve(dir, (hash) => `approved tools ${hash}`);
     fails(dir, 1, 'allowlist', 'write', ...APPROVED);
@@ -308,17 +308,6 @@ test('allowlist --approved needs a tool list that loads and a project', async ()
     tools(dir, '{"requires":"node"}');
     fails(dir, 1, 'allowlist', 'write', ...APPROVED);
     assert.ok(!fs.existsSync(settingsOf(dir)));
-  });
-});
-
-test('allowlist hash prints the tool list hash, and --json gives it as {hash}', async () => {
-  await tmp(async (dir) => {
-    tools(dir, LIST);
-    const { hash } = loadTools(dir);
-    assert.equal(ril(dir, 'allowlist', 'hash').stdout, `${hash}\n`);
-    assert.deepEqual(JSON.parse(ril(dir, '--json', 'allowlist', 'hash').stdout), { hash });
-    fs.rmSync(path.join(dir, '.ril', 'tools.json'));
-    fails(dir, 1, 'allowlist', 'hash');
   });
 });
 

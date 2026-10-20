@@ -35,6 +35,10 @@ test('a seal stores the ids of the protected paths and a changed file refuses a 
 
     commitFile(dir, 'tests/acceptance/a.sh', 'check 1\n');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0, 'restored files match the seal again');
+    const passed = head(dir);
+    commitFile(dir, 'tests/acceptance/a.sh', 'check 1 weakened again\n');
+    assert.match(fails(dir, 1, '--force', 'redo', 'ledger', 'carry', 'S1', passed, head(dir)).stderr, /tests\/acceptance/, 'a carry is refused too, and --force does not bypass');
+    commitFile(dir, 'tests/acceptance/a.sh', 'check 1\n');
     commitFile(dir, 'tests/acceptance/a.sh', 'check 2\n');
     ok(dir, 'checkpoint', '--seal');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0, 'a new seal clears the refusal');
