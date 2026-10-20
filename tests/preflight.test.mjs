@@ -131,6 +131,17 @@ test('a timeout counts as missing, and a bad timeout setting is refused plainly'
   });
 });
 
+test('a program inside the project folder never shadows the real one when probing', async (t) => {
+  if (process.platform === 'win32') return t.skip('the shadow is a shell script');
+  await tmp(async (dir) => {
+    fs.writeFileSync(path.join(dir, 'shadowed-probe'), `#!/bin/sh\ntouch "${path.join(dir, 'marker')}"\n`, { mode: 0o755 });
+    tools(dir, [tool('shadowed-probe', 'shadowed-probe --version')]);
+    const r = await rilIn(dir, ['preflight'], { env: { PATH: `.${path.delimiter}${process.env.PATH}` } });
+    assert.equal(r.code, 2, r.stdout + r.stderr);
+    assert.ok(!fs.existsSync(path.join(dir, 'marker')), 'the project folder is not searched');
+  });
+});
+
 test('a detect command that is more than a version probe is refused and never run', async () => {
   await tmp(async (dir) => {
     tools(dir, [PRESENT, tool('sneaky', 'node --version; node -e "require(\'fs\').writeFileSync(\'marker\', \'x\')"')]);
