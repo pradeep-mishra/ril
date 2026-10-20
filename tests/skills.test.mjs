@@ -506,10 +506,14 @@ test('the seal: recorded after each tester, compared after every implementer or 
     assert.match(body, /(?:seal mismatch|`Protected:` must-fix)[^\n]*fresh `tester`[^\n]*never a fixer or the implementer/, name);
   }
   const build = readSkill('ril-build').body;
-  assert.match(build, /`ril decision log --stage build --decision "Sealed <task unit>: tests <tree hash>; scripts <values>" --why "tester finished"`/);
+  assert.match(build, /`ril decision log --stage build --decision "Sealed <task unit\(s\)>: tests <tree hash>; scripts <values>" --why "tester finished"`/);
+  assert.match(build, /after the last of several parallel testers finishes[^\n]*one `ril checkpoint`/);
   assert.match(build, /`git rev-parse T:tests\/acceptance`/);
   assert.match(build, /`git show T:package\.json`/);
-  assert.match(build, /latest seal of that task unit/);
+  for (const [name, body] of [['ril-build', build], ['ril-verify', readSkill('ril-verify').body]]) {
+    has(body, ['the latest `Sealed` decision in `ril decision list` (the last one listed, whichever task it names)'], name);
+    for (const gone of ['latest seal of that task unit', 'owns it', "plan's latest seal", 'tester versions']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
+  }
   assert.ok(!build.includes('--checkpoint <id>`'), 'no tester checkpoint stored on the task unit');
   const verify = readSkill('ril-verify').body;
   assert.match(verify, /changed since the seal[^\n]*records `blocked`[^\n]*seal check/);
