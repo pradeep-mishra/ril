@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+// Dynamic import works whether Node treats this extensionless file as a module or as a script.
+import('../lib/cli.mjs')
+  .then(({ run }) => run(process.argv.slice(2)))
+  .then((code) => {
+    process.exitCode = code;
+  });

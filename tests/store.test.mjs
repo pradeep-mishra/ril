@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { tmpProject } from './helpers/tmp.mjs';
 import { RilError } from '../lib/errors.mjs';
 import { emptyState, validate } from '../lib/schema.mjs';
-import { statePath, load, mutate } from '../lib/store.mjs';
+import { statePath, load, mutate, createState } from '../lib/store.mjs';
 
 const child = path.join(path.dirname(fileURLToPath(import.meta.url)), 'helpers', 'store-child.mjs');
 
@@ -206,5 +206,43 @@ test('missing state asks for ril init', () => {
     assert.throws(() => load(dir), (e) => e instanceof RilError && e.code === 2 && /Next: run ril init/.test(e.message));
   } finally {
     cleanup();
+  }
+});
+
+test('createState writes a new state file and creates .ril when needed', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-create-'));
+  try {
+    const state = emptyState({ project: 'fresh', mode: 'guided' });
+    createState(dir, state);
+    assert.equal(read(statePath(dir)), `${JSON.stringify(state, null, 2)}\n`);
+    assert.deepEqual(load(dir), state);
+    assert.deepEqual(fs.readdirSync(path.join(dir, '.ril')), ['state.json'], 'no temp, backup or lock files left');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('createState refuses to replace an existing state file', () => {
+  const { dir, cleanup } = project();
+  try {
+    const before = read(statePath(dir));
+    assert.throws(
+      () => createState(dir, emptyState({ project: 'other', mode: 'guided' })),
+      (e) => e instanceof RilError && e.code === 1 && /Next: /.test(e.message),
+    );
+    assert.equal(read(statePath(dir)), before);
+  } finally {
+    cleanup();
+  }
+});
+
+test('createState refuses an invalid state and writes nothing', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-create-'));
+  try {
+    const bad = { ...emptyState({ project: 'x', mode: 'guided' }), mode: 'loose' };
+    assert.throws(() => createState(dir, bad), (e) => e instanceof RilError && /Next: /.test(e.message));
+    assert.equal(fs.existsSync(statePath(dir)), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
