@@ -5,6 +5,7 @@ import path from 'node:path';
 import { ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
 import { checkBrief } from '../lib/brief.mjs';
+import { kitTrust } from '../lib/proof.mjs';
 import {
   headings, helpGroups, readFile, readRole, readSkill, repoRoot, rilCommandsIn, roleNames, skillNames,
 } from './helpers/skills.mjs';
@@ -13,7 +14,8 @@ const ROLES = ['author', 'tester', 'implementer', 'reviewer', 'verifier', 'fixer
 const PARTS = ['Outcome', 'Rules', 'Done when', 'Involve the person when', 'Ask the CLI'];
 const TOOLS = ['Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash'];
 const OWNER = { author: 'ril-shape', tester: 'ril-build', implementer: 'ril-build', reviewer: 'ril-review', verifier: 'ril-verify', fixer: 'ril-verify' };
-const DIRECTION = ['principles.md', 'templates/standing-rules.md', 'templates/agent-brief.md', 'templates/agent-report.md', 'templates/spec.md', 'templates/project-brief.md'];
+const DIRECTION = ['principles.md', 'templates/standing-rules.md', 'templates/agent-brief.md', 'templates/agent-report.md', 'templates/spec.md', 'templates/project-brief.md',
+  'templates/feature-map.md', 'templates/stop-report.md', 'templates/verify.md'];
 
 const skills = () => skillNames().map((name) => ({ name, ...readSkill(name) }));
 const roles = () => roleNames().map((name) => ({ name, ...readRole(name) }));
@@ -335,4 +337,136 @@ test('no file names another plugin', () => {
   for (const f of files) {
     for (const name of FORBIDDEN) assert.ok(!f.text.toLowerCase().includes(name), `${f.file} names another plugin`);
   }
+});
+
+const ALL_SKILLS = ['ril', 'ril-control', 'ril-shape', 'ril-design', 'ril-review', 'ril-recipe', 'ril-build', 'ril-verify'];
+const LAST_SKILLS = ['ril-recipe', 'ril-build', 'ril-verify'];
+const at = (body, phrase) => {
+  const i = body.indexOf(phrase);
+  assert.ok(i >= 0, `missing: ${phrase}`);
+  return i;
+};
+
+test('exactly the eight skills; the last three within 120 lines, with the five parts', () => {
+  assert.deepEqual(skillNames().sort(), [...ALL_SKILLS].sort());
+  for (const name of LAST_SKILLS) {
+    const s = readSkill(name);
+    assert.ok(s.lines <= 120, `${s.file} has ${s.lines} lines`);
+    assert.deepEqual(headings(s.body), PARTS, s.file);
+  }
+});
+
+test('ril-recipe: an untrusted kit with protected paths, a doctor and a self-run that must catch a break', () => {
+  const { body, file } = readSkill('ril-recipe');
+  has(body, ['`Trusted: no`', '`Protected:`', '`## Doctor`', '`## Self-run`', 'deliberate break', 'real UI proof', '`Method:',
+    '`Covers:`', '`Synced at:`', 'templates/feature-map.md', 'templates/verify.md', 'recipes/cli/recipe.md', 'how many checks it ran',
+    'drift', '`ril scenario coverage`'], file);
+  assert.match(body, /never weaken/i);
+  assert.match(body, /only prove command-line/);
+  assert.match(body, /never invent a recipe/i);
+  const gate = /`ril gate park [^`]*--options "rewrite it\|accept it unproven\|drop it"[^`]*`/.exec(body);
+  assert.ok(gate, 'a scenario this version cannot prove is parked as a question for the person');
+  for (const cmd of ['scenario', 'gate', 'preflight', 'allowlist']) assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
+});
+
+test('feature map template: Method first, then Covers and Synced at, then the four parts', () => {
+  const f = readFile('templates/feature-map.md');
+  const lines = f.text.split('\n');
+  assert.match(lines[0], /^Method: /);
+  assert.match(lines[1], /^Covers: /);
+  assert.match(lines[2], /^Synced at: /);
+  assert.deepEqual(headings(f.text), ['Sub-features', 'How to get to it', 'Driving it', 'Gotchas']);
+});
+
+test('a filled feature map passes ril scenario coverage', () => {
+  const p = tmpProject();
+  try {
+    assert.equal(ril(p.dir, 'init').code, 0);
+    const add = ril(p.dir, 'scenario', 'add', 'S1', '--title', 'Greets', '--method', 'cli', '--criterion', 'hello prints hi');
+    assert.equal(add.code, 0, add.stdout + add.stderr);
+    assert.equal(ril(p.dir, 'scenario', 'coverage').code, 2, 'no map yet');
+    const filled = readFile('templates/feature-map.md').text.replace(/^Method: <[^>\n]+>/, 'Method: cli').replace(/<[^>\n]+>/g, 'filled');
+    const folder = path.join(p.dir, '.ril', 'docs', 'verification', 'feature-map');
+    fs.mkdirSync(folder, { recursive: true });
+    fs.writeFileSync(path.join(folder, 'S1.md'), filled);
+    const r = ril(p.dir, 'scenario', 'coverage');
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+  } finally {
+    p.cleanup();
+  }
+});
+
+test('verify.md template: untrusted until the self-run, protected paths, the six parts', () => {
+  const f = readFile('templates/verify.md');
+  assert.ok(f.lines <= 40, `${f.lines} lines`);
+  const lines = f.text.split('\n');
+  assert.equal(lines[0], 'Trusted: no');
+  assert.ok(lines.some((l) => l.startsWith('Protected: ')), 'a Protected: line');
+  assert.deepEqual(headings(f.text), ['Launch', 'Drive', 'Evidence', 'Cleanup', 'Doctor', 'Self-run']);
+  const selfRun = f.text.slice(f.text.indexOf('## Self-run'));
+  has(selfRun, ['deliberate break', 'undo', 'cleanup', 'Trusted: yes (<saved version>)'], 'Self-run');
+  assert.match(f.text.slice(f.text.indexOf('## Doctor'), f.text.indexOf('## Self-run')), /checks/);
+});
+
+test('verify.md template, as written, keeps the kit untrusted until its first line changes', () => {
+  const p = tmpProject();
+  try {
+    const kit = path.join(p.dir, '.ril', 'docs', 'verification');
+    fs.mkdirSync(kit, { recursive: true });
+    const text = readFile('templates/verify.md').text;
+    fs.writeFileSync(path.join(kit, 'verify.md'), text);
+    assert.equal(kitTrust(p.dir), 'untrusted');
+    fs.writeFileSync(path.join(kit, 'verify.md'), text.replace(/^Trusted: no$/m, 'Trusted: yes (abc1234)'));
+    assert.equal(kitTrust(p.dir), 'trusted');
+  } finally {
+    p.cleanup();
+  }
+});
+
+test('stop report template: the five parts and the four options', () => {
+  const f = readFile('templates/stop-report.md');
+  assert.deepEqual(headings(f.text), ['What works', 'What does not work yet', 'What was tried', 'Evidence', 'Your options']);
+  const options = f.text.slice(f.text.indexOf('## Your options'));
+  has(options, ['simplify the scenario', 'change the approach', 'give a hint', 'stop'], 'Your options');
+});
+
+test('ril-build: tasks file, a pilot first, tester then implementer, honest tests, protected paths, full review', () => {
+  const { body, file } = readSkill('ril-build');
+  has(body, ['<project>/.ril/docs/plans/plan-<n>-tasks.md', 'pilot', 'fresh', 'disjoint', '`Protected:`', '`ril-control`',
+    'an expected value computed by the code under test', 'an assertion on data the test built itself',
+    'an assertion looser than the contract', 'no positive case', 'fail when the behavior breaks', 'only internals change',
+    'plan-<n>-t<k>', '`ril unit set', '`ril checkpoint`', 'FULL'], file);
+  assert.match(body, /never sees the implementation/);
+  assert.ok(at(body, '`tester`') < at(body, '`implementer`'), 'the tester comes before the implementer');
+  const review = at(body, '`ril-review`');
+  assert.ok(review < body.lastIndexOf('`ril-verify`'), 'review before verification');
+  assert.ok(at(body, 'pilot') < at(body, 'disjoint'), 'the pilot runs before the rest');
+  for (const cmd of ['unit', 'agent', 'checkpoint', 'progress']) assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
+});
+
+test('ril-verify: layers, reviewer first, verdicts, the fix loop and the stop report', () => {
+  const { body, file } = readSkill('ril-verify');
+  has(body, ['Layer 1 tests', 'Layer 2 live proof', 'Layer 3 adversarial review', 'Layer 4 break-it pass', '`Self-run`', 'Trusted: yes',
+    '`ril ledger record', '--checks', 'RESULT', 'must-fix: 0', 'Accepted risk for <id>', '`ril round bump', 'two fixers',
+    'separate worktrees', 'prototype', 'stop-', 'templates/stop-report.md', '`Protected:`', 'measured, inferred or guess',
+    'expected, actual', 'assumption', 'Autonomous mode'], file);
+  assert.match(body, /never lower a pass condition/i);
+  assert.match(body, /`blocked`[^\n]*`ril doctor`[^\n]*never to a fixer/);
+  assert.match(body, /reject zero/);
+  const reviewer = at(body, 'Reviewer first');
+  const verifier = at(body, 'Then the verifiers');
+  assert.ok(reviewer < verifier, 'the reviewer runs before the verifiers');
+  assert.match(body.slice(verifier), /reviewer's report[^\n]*`inputs`/);
+  assert.match(body, /set aside[^\n]*never try to prove/i);
+  for (const cmd of ['ledger', 'round', 'agent', 'scenario', 'skip', 'decision', 'checkpoint', 'stage']) {
+    assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
+  }
+});
+
+test('ril-verify accept mode: fresh verifier, traceability, scans, guide, final report, then done', () => {
+  const { body, file } = readSkill('ril-verify');
+  const accept = body.slice(at(body, '**Accept mode'));
+  has(accept, ['fresh', 'traceability', 'secrets', 'README', 'how-to-use', "person's machine", '<project>/.ril/docs/reports/final.md',
+    'What is not covered', 'accepted without proof', '`ril decision list`', '`ril ledger carry', '`ril scenario list`', '`ril ledger summary`'], file);
+  assert.ok(at(accept, 'final.md') < at(accept, '`ril stage set done`'), 'the final report before done');
 });
