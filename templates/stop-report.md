@@ -1,22 +1,20 @@
-<!-- Stop report, saved as .ril/docs/reports/stop-<yyyymmdd-hhmmss>.md when a scenario used all its fix rounds. Plain words for the person, no ids or commands; label each claim measured, inferred or guess. Delete this line. -->
-# Stopped: <the scenario in plain words>
+<!-- Plain words, no ids or commands; claims labelled measured, inferred or guess. Delete this line. -->
+# Stopped: <the promise>
 
 ## What works
-- <Each promise that is proven, and what the person can already do with the program.>
 
 ## What does not work yet
-- <The stuck promise: what should happen, what happens instead, in plain words.>
+- <Expected, observed.>
 
 ## What was tried
-- <Each fix round in one line: the cause it assumed, what it changed, and why that did not work.>
+- <Per round: assumed cause, change, result.>
 
 ## Evidence
-- <A relative link to each failure report and transcript under .ril/evidence/.>
 
 ## Your options
-- **simplify the scenario**: <a smaller promise that would work, in plain words>.
-- **change the approach**: <the different way I would build it next>.
-- **give a hint**: tell me something you know that I may be missing.
-- **stop**: set this promise aside; the final report lists it as accepted without proof.
+- **simplify the scenario**: <a smaller promise>.
+- **change the approach**: <how>.
+- **give a hint**: what I may be missing.
+- **stop**: set it aside as unproven.
 
-My pick: <one option and why>. <What happens next.>
+My pick: <option, why>. <What happens next.>

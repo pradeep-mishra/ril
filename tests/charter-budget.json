@@ -1,10 +1,10 @@
 {
-  "skillCount": { "ceiling": 8, "target": 1 },
-  "directionWords": { "ceiling": 14532, "target": 5500 },
-  "bannedTermHits": { "ceiling": 85, "target": 0 },
+  "skillCount": { "ceiling": 1, "target": 1 },
+  "directionWords": { "ceiling": 5500, "target": 5500 },
+  "bannedTermHits": { "ceiling": 0, "target": 0 },
   "prosePins": { "ceiling": 0, "target": 0 },
-  "engineLines": { "ceiling": 2654, "target": 2500 },
+  "engineLines": { "ceiling": 2649, "target": 2500 },
   "commandGroups": { "ceiling": 18, "target": 18 },
-  "testLines": { "ceiling": 4567, "target": 4000 },
-  "agentCount": { "ceiling": 6, "target": 1 }
+  "testLines": { "ceiling": 4528, "target": 4000 },
+  "agentCount": { "ceiling": 1, "target": 1 }
 }

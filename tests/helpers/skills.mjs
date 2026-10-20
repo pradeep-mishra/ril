@@ -23,14 +23,6 @@ function readMarkdown(file) {
   return { file, text, ...parseFrontmatter(text), lines };
 }
 
-export const skillNames = () =>
-  fs.readdirSync(path.join(repoRoot, 'skills'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
-
-export const roleNames = () =>
-  fs.readdirSync(path.join(repoRoot, 'agents')).filter((n) => n.endsWith('.md')).map((n) => n.slice(0, -3));
-
-export const readSkill = (name) => readMarkdown(path.join(repoRoot, 'skills', name, 'SKILL.md'));
-export const readRole = (name) => readMarkdown(path.join(repoRoot, 'agents', `${name}.md`));
 export const readFile = (rel) => readMarkdown(path.join(repoRoot, rel));
 
 // The group word after each `ril ` inside inline code or a fenced block.

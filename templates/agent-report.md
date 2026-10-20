@@ -1,6 +1,10 @@
-<!-- Agent report. done: you did your job; findings or a failed verdict still count as done, put them in RESULT. failed: you could not do your job; say why. blocked: the environment is broken (a tool, file, network or permission is missing); say what is missing. Keep only the four keys below. -->
+<!-- Your reply, never a file. A reviewer adds a finding item per finding; a failed verdict adds expected, observed and repro. Delete this line. -->
 STATUS: done|failed|blocked
-RESULT: <one plain line>
+RESULT: <one line; a reviewer starts "must-fix: N, noted: M"; a verifier names its verdict>
 EVIDENCE:
-- <path>
+- <path of a saved file>
+- finding: <must-fix|noted> <scenario ids> <what breaks, where>
+- expected: <what the criterion says>
+- observed: <what was seen, verbatim>
+- repro: <steps from the kit's starting state>
 NEXT: <one line>

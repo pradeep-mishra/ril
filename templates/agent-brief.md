@@ -1,17 +1,18 @@
-<!-- Agent brief: at most 60 lines. One "field:" line each; list fields take "- " items. Paths, never pasted content. Delete this line. -->
+<!-- Agent brief, at most 60 lines: "field:" lines, list fields take "- " items, paths not pasted text. Delete this line. -->
 role: <author|tester|implementer|reviewer|verifier|fixer>
-unit: <the plan, task, scenario or stage this work is for>
-goal: <one line: the outcome, not the steps>
+unit: <the plan, task, scenario or stage>
+goal: <one line: the outcome>
 inputs:
 - <absolute path of a file to read>
+- <plugin folder>/templates/agent-report.md
 acceptance:
-- <a checkable condition that means the work is done>
+- <a checkable condition, copied, never loosened>
 touch:
-- <absolute path of a file or folder this agent may change>
+- <absolute path this agent may change>
 rules:
-- <plugin folder>/templates/standing-rules.md
+- <plugin folder>/skills/ril/worker-rules.md
 - <plugin folder>/principles.md
 ril: <the exact command that runs ril>
 report: agent-report
 stop:
-- <when to stop and report>
+- <when to stop and reply, including the stop list>
