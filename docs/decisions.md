@@ -62,3 +62,9 @@ Filled in by the owner after each real run (see `tests/e2e/RUNBOOK.md`).
 
 | Date | Run | What needed a human or stalled | What we changed |
 |------|-----|--------------------------------|-----------------|
+| 2026-10-20 | Baseline run (todo, 15 scenarios, 82 agents, 2h14m, at least $28.5): all proven, checker accepted, but not unattended | C1: 87 worker commands denied by the 12-entry allowlist, finished only with all of Bash; C2: workers could not read the plugin folder | Tool list approved at design (R2); allowlist adds the plugin read rule (R2); one-simple-command rule for workers (R3) |
+| 2026-10-20 | Baseline run | I1: batch verifiers proved 15 scenarios with 2 verifiers; reviews skipped to save budget; no rail saw it | Ledger refuses a verdict when the verifier's registered unit is not that scenario (R2); never-skip rule (R3) |
+| 2026-10-20 | Baseline run | I2: the host refuses workers writing report files (166 times); controller saved replies and once changed a failed to done | The reply is the report, saved verbatim (R3) |
+| 2026-10-20 | Baseline run | I3, I5, I6, I7, I8: controller ran tests and shell fixes itself; turns ended with nothing running; no catch-up after a new session; person's email filled in; review caps accepted real defects | Short rules in the router (R3), each citing this row |
+| 2026-10-20 | Baseline run | I4: Finder and Explorer files tracked, then blocked proofs | `ril init` ignores them (R2) |
+| 2026-10-20 | Baseline run | M3: 15 scenarios and 82 agents for four commands; drill: resume without redoing proven work passed, catching a killed worker not exercised, catch-up failed | At most 8 first-version scenarios (R3); R4 repeats the drill with a worker running at the kill |
