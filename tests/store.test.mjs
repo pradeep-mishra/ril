@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -143,6 +144,56 @@ test('damaged json', () => {
     assert.throws(() => load(dir), (e) => e instanceof RilError && e.code === 1 && /ril doctor --fix/.test(e.message));
     fs.writeFileSync(statePath(dir), JSON.stringify({ version: 1, cap: 99 }));
     assert.throws(() => load(dir), (e) => e instanceof RilError && e.code === 1 && /ril doctor --fix/.test(e.message));
+  } finally {
+    cleanup();
+  }
+});
+
+test('mutate in a folder with no .ril asks for ril init', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-bare-'));
+  try {
+    assert.throws(() => mutate(dir, () => {}), (e) => e instanceof RilError && e.code === 2 && /Next: run ril init/.test(e.message));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('many processes racing to clear one stale lock lose no update', async () => {
+  const { dir, cleanup } = project();
+  try {
+    fs.writeFileSync(lockFile(dir), `99999999 ${new Date().toISOString()}`);
+    await Promise.all(Array.from({ length: 8 }, (_, i) => run([dir, 'mutate', '1', `c${i}`])));
+    assert.equal(load(dir).decisions.length, 8);
+    assert.equal(fs.existsSync(lockFile(dir) + '.break'), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('parkedFrom is set only while parked', () => {
+  const s = emptyState({ project: 'demo', mode: 'guided', now: new Date() });
+  assert.match(validate({ ...s, parkedFrom: 'design' }).join('\n'), /parkedFrom/);
+  assert.match(validate({ ...s, stage: 'parked' }).join('\n'), /parkedFrom/);
+  assert.deepEqual(validate({ ...s, stage: 'parked', parkedFrom: 'design' }), []);
+});
+
+test('system error text stays out of the message and goes in detail', () => {
+  const { dir, cleanup } = tmpProject();
+  try {
+    fs.mkdirSync(statePath(dir)); // a folder where the file should be: reading it fails
+    assert.throws(() => load(dir), (e) => e instanceof RilError && !/E[A-Z]{3,}/.test(e.message) && /E[A-Z]{3,}/.test(e.detail));
+  } finally {
+    cleanup();
+  }
+});
+
+test('the backup is written through a temp file and renamed into place', () => {
+  const { dir, cleanup } = project();
+  try {
+    const before = read(statePath(dir));
+    mutate(dir, decide('one'));
+    assert.equal(read(statePath(dir) + '.bak'), before);
+    assert.equal(fs.existsSync(statePath(dir) + '.bak.tmp'), false);
   } finally {
     cleanup();
   }
