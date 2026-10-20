@@ -1,0 +1,11 @@
+{
+  "name": "ril",
+  "owner": { "name": "ril" },
+  "plugins": [
+    {
+      "name": "ril",
+      "source": "./",
+      "description": "Turns an idea into proven, working software."
+    }
+  ]
+}

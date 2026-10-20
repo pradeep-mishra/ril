@@ -1,0 +1,8 @@
+{
+  "name": "ril",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": { "ril": "bin/ril" },
+  "scripts": { "test": "node --test" },
+  "engines": { "node": ">=20" }
+}
