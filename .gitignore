@@ -1,3 +1,6 @@
 node_modules
 .DS_Store
 .ril/
+.superpowers
+docs/superpowers
+examples/
