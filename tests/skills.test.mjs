@@ -13,7 +13,7 @@ const ROLES = ['author', 'tester', 'implementer', 'reviewer', 'verifier', 'fixer
 const PARTS = ['Outcome', 'Rules', 'Done when', 'Involve the person when', 'Ask the CLI'];
 const TOOLS = ['Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash'];
 const OWNER = { author: 'ril-shape', tester: 'ril-build', implementer: 'ril-build', reviewer: 'ril-review', verifier: 'ril-verify', fixer: 'ril-verify' };
-const DIRECTION = ['principles.md', 'templates/standing-rules.md', 'templates/agent-brief.md', 'templates/agent-report.md', 'templates/spec.md'];
+const DIRECTION = ['principles.md', 'templates/standing-rules.md', 'templates/agent-brief.md', 'templates/agent-report.md', 'templates/spec.md', 'templates/project-brief.md'];
 
 const skills = () => skillNames().map((name) => ({ name, ...readSkill(name) }));
 const roles = () => roleNames().map((name) => ({ name, ...readRole(name) }));
@@ -141,11 +141,12 @@ test('front door handles a missing ril, in all four cases', () => {
   assert.match(body, /There is no ril project[^\n]*is not a missing `ril`/, 'no project is not a missing ril');
 });
 
-test('front door: init before doctor, never spawns', () => {
+test('front door: no project starts ril-shape before any doctor, never spawns', () => {
   const { body } = readSkill('ril');
-  const init = body.indexOf('run `ril init` (do not run doctor first)');
+  const shape = body.indexOf('No `.ril/` folder: start `ril-shape` (it runs `ril init` once it knows the mode); do not run doctor first.');
   const doctor = body.indexOf('Otherwise run `ril doctor --fix --quiet`');
-  assert.ok(init >= 0 && doctor > init, 'init rule must come before the doctor rule');
+  assert.ok(shape >= 0 && doctor > shape, 'the no-project rule must come before the doctor rule');
+  assert.doesNotMatch(body, /run `ril init` \(do not run doctor first\)/, 'the front door no longer runs init itself');
   assert.match(body, /Never spawn an agent yourself/);
 });
 
@@ -173,7 +174,7 @@ test('ril-control: touch paths, report format, spawn failure, gate flags', () =>
   assert.match(body, /--result "could not start"/);
   assert.match(body, /back to `todo`/);
   assert.match(body, /`ril gate park <id> --question "[^`]*" --options [^`]* --default [^`]*`/);
-  assert.match(body, /plain words/);
+  assert.match(body, /\*\*The person\.\*\* Whenever you involve the person, speak in plain words, one question at a time/);
   assert.match(body, /Never review a diff yourself/);
   assert.match(body, /never resume/);
 });
@@ -208,6 +209,82 @@ test('spec template imports clean', () => {
   } finally {
     p.cleanup();
   }
+});
+
+const STAGE_SKILLS = ['ril-shape', 'ril-design', 'ril-review'];
+const has = (body, phrases, file) => { for (const p of phrases) assert.ok(body.includes(p), `${file} lacks: ${p}`); };
+
+test('the three stage skills exist, within 120 lines, with the five parts', () => {
+  for (const name of STAGE_SKILLS) {
+    assert.ok(skillNames().includes(name), name);
+    const s = readSkill(name);
+    assert.ok(s.lines <= 120, `${s.file} has ${s.lines} lines`);
+    assert.deepEqual(headings(s.body), PARTS, s.file);
+  }
+  assert.ok(skillNames().length <= 8, 'at most 8 skills');
+});
+
+test('ril-shape: asks the mode before init, command-line only, provable spec', () => {
+  const { body, file } = readSkill('ril-shape');
+  has(body, ['my assumption', 'Needs a person', '## Later', 'one question at a time', 'play the idea back', 'what is wrong',
+    'simplest stack', 'observe it instead', '`ril scenario import .ril/docs/spec.md`', '`Criterion:`', '`Proof: cli`',
+    'ui, api, cli and golden', '.ril/docs/intake.md', '`ril-review`', '`ril-control`', 'install it for you, or guide you step by step',
+    'trust this folder', '`ril stage set design`'], file);
+  has(body, ['`ril preflight ${CLAUDE_PLUGIN_ROOT}/recipes/cli`', '`ril allowlist write --base --tool claude`',
+    '`ril allowlist write --recipe ${CLAUDE_PLUGIN_ROOT}/recipes/cli --tool claude`'], file);
+  for (const cmd of ['init', 'scenario', 'gate', 'decision', 'preflight', 'allowlist', 'progress', 'stage']) {
+    assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
+  }
+  const mode = body.indexOf('Ask the mode');
+  const init = body.indexOf('`ril init --mode');
+  assert.ok(mode >= 0 && init > mode, 'the mode is asked before ril init runs');
+  assert.match(body, /Autonomous[^\n]*default/);
+  assert.match(body, /Guided/);
+  assert.match(body, /command-line programs only/);
+  assert.match(body, /web page, a phone app or a desktop window/);
+  assert.match(body, /stop there/);
+  assert.doesNotMatch(body, /Proof:\s*human/i, 'never a human proof');
+  assert.match(body, /target and stack[^\n]*spec|spec[^\n]*target and stack/i, 'guided sign-offs');
+});
+
+test('ril-design: simple design, red flags, proof kit first, plans and the brief', () => {
+  const { body, file } = readSkill('ril-design');
+  has(body, ['walking skeleton', 'vertical slice', 'proves exactly one scenario', '`ril scenario coverage`', 'simplicity budget',
+    'bug would cost the most', 'at most three', 'property-based or generated-input', 'Security and non-functional',
+    'shallow module', 'one decision leaked into several modules', 'two modules writing the same state', 'two ways to do one task',
+    'internals other code can import', 'a list kept by hand in two places', 'linter, type check, formatter', '`verify` command',
+    'how many it ran', '`ril-recipe`', 'before any code', '`ril unit add plan-<n> --kind plan', 'one agent', '`ril-review`',
+    'Accepted as unproven: <id>', '`ril scenario update', 'templates/project-brief.md', '.ril/docs/brief.md', '`author`'], file);
+  const brief = body.indexOf('templates/project-brief.md');
+  const confirm = body.indexOf('`ril stage set confirm`');
+  assert.ok(brief >= 0 && confirm > brief, 'the brief is written before the stage moves to confirm');
+  assert.match(body, /rewrite it\|accept it unproven\|drop it/);
+  assert.match(body, /design[^\n]*plan list/i, 'guided sign-offs');
+});
+
+test('ril-review: only the artifact and the spec, triage in RESULT, round caps', () => {
+  const { body, file } = readSkill('ril-review');
+  has(body, ['only the artifact and the spec', 'never the author', 'must-fix', 'noted', 'RESULT', 'not STATUS', '`STATUS: done`',
+    'fresh `author`', 'never a resumed one', 'fresh reviewer', 'at most 2 rounds', 'at most 3 rounds', 'never invent',
+    'Accepted risk for <id or artifact>', '`ril decision log', 'plainly', '`ril-control`'], file);
+  assert.match(body, /missing cases, contradictions, needless complexity, security/);
+});
+
+test('project brief template: one page, plain, links and the go line', () => {
+  const f = readFile('templates/project-brief.md');
+  assert.ok(f.lines <= 30, `${f.lines} lines`);
+  has(f.text, ['(spec.md)', '(design.md)', '(plans/plan-1.md)', 'My assumptions', 'What it will not do', 'What I need from you',
+    'Where it runs and what it is built with', 'Reply **go** to start building, or tell me what to change.'], f.file);
+});
+
+test('carried fixes: verifier review none, spawn reset only for units, absolute evidence touch', () => {
+  assert.match(readRole('verifier').body, /no reviewer report[^\n]*`--review none`[^\n]*refuse/);
+  const control = readSkill('ril-control').body;
+  assert.match(control, /back to `todo`[^\n]*only when the unit is a plan or task/);
+  assert.match(control, /`<project>\/\.ril\/evidence\/<scenario>\/<checkpoint>\/`/);
+  assert.doesNotMatch(control, /verifier, `\.ril\/evidence/);
+  const door = readSkill('ril').body;
+  assert.match(door, /There is no ril project[^\n]*start `ril-shape`/);
 });
 
 // Names of other tools RIL must never mention, encoded so this file does not mention them either.

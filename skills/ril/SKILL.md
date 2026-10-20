@@ -11,9 +11,9 @@ The person's idea becomes software that runs on their machine, with every promis
 
 ## Rules
 
-**Start, on every invocation.** If there is no `.ril/` folder, run `ril init` (do not run doctor first), then start `ril-shape`. Otherwise run `ril doctor --fix --quiet` (add `--new-session` if you have spawned no agent in this conversation) before anything else.
+**Start, on every invocation.** No `.ril/` folder: start `ril-shape` (it runs `ril init` once it knows the mode); do not run doctor first. Otherwise run `ril doctor --fix --quiet` (add `--new-session` if you have spawned no agent in this conversation) before anything else.
 
-**If `ril` cannot be run** (command not found, or it crashes before printing a plain message), tell the person exactly how to fix it and stop. Exit 2 with "There is no ril project" is not a missing `ril`; it means run `ril init`. Check `node --version` and `command -v ril`, then say the one fix that applies:
+**If `ril` cannot be run** (command not found, or it crashes before printing a plain message), tell the person exactly how to fix it and stop. Exit 2 with "There is no ril project" is not a missing `ril`; it means there is no project yet: start `ril-shape`. Check `node --version` and `command -v ril`, then say the one fix that applies:
 - Node.js is missing or older than 20: "Install Node.js 20 or newer from nodejs.org, then start a new session and type /ril."
 - `ril` is not found: "Make sure the ril plugin is installed and turned on, then start a new session and type /ril."
 - `ril` is found outside `${CLAUDE_PLUGIN_ROOT}/bin`: "Another program called ril is ahead of this one on your PATH. Rename or remove it, then start a new session."
@@ -30,7 +30,7 @@ Do nothing else until it runs.
 |-------|-------------|
 | shape | start `ril-shape` |
 | design | start `ril-design` |
-| confirm | summarise `.ril/docs/brief.md` in plain words and tell them where to read it; wait for the person to say go, then `ril stage set build` |
+| confirm | summarise `.ril/docs/brief.md` in plain words and tell them where to read it; wait for the person to say go, then `ril stage set build`; if they ask for changes, `ril-design` makes them and asks again |
 | build | for each plan, `ril-build` then `ril-verify` |
 | accept | `ril-verify` in accept mode |
 | done | show the final report, `.ril/docs/reports/final.md` |
@@ -72,7 +72,6 @@ The project is checked, the person knows where it stands and what happens next, 
 ## Ask the CLI
 
 - `ril doctor --fix --quiet` (with `--new-session` when you have spawned nothing yet): check and repair.
-- `ril init`: start a project in this folder.
 - `ril stage get`, `ril stage set`: where the project is, and the go after confirm.
 - `ril status --full`: the full picture for a status request.
 - `ril gate list`, `ril gate resolve`: questions waiting on the person.
