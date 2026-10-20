@@ -485,7 +485,6 @@ test('ril-verify accept mode: fresh verifier, traceability, scans, guide, final 
   has(accept, ['`git grep', 'audit'], file);
 });
 
-const PROTECTED_CHECK = /Every saved version since the plan's start that changed a `Protected:` path must be a `Tester version`: run `git log --format='%h %s' <plan start>\.\.<[^>]+> -- <Protected paths>`[^\n]*every subject must start `Tester version`, except a version that a later `Tester version restoring <id>` message names as restored/;
 
 test('protected set: acceptance tests and the verify entries only; kit documents follow touch', () => {
   for (const name of LAST_SKILLS) assert.doesNotMatch(readSkill(name).body, /`Protected:`[^\n]{0,80}\.ril\/docs\/verification/, name);
@@ -497,15 +496,26 @@ test('protected set: acceptance tests and the verify entries only; kit documents
   for (const name of ['ril-build', 'ril-verify']) has(readSkill(name).body, ['tests/regression/'], name);
 });
 
-test('tester versions: saved and stored on the task unit, and checked by the reviewer and the verifier', () => {
+test('the seal: recorded after each tester, compared after every implementer or fixer, mismatches go to a tester', () => {
+  const scripts = ['verify', 'test', 'preverify', 'postverify', 'pretest', 'posttest'];
+  for (const name of ['ril-build', 'ril-verify']) {
+    const { body } = readSkill(name);
+    has(body, ['Sealed', '`git rev-parse', 'tests/acceptance', 'after every implementer or fixer', 'fresh `tester`'], name);
+    for (const k of scripts) assert.match(body, new RegExp(`\\b${k}\\b`), `${name} lacks script ${k}`);
+    for (const gone of ['Tester version', 'plan start', 'newest', 'resets the baseline', 'restoring']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
+    assert.match(body, /(?:seal mismatch|`Protected:` must-fix)[^\n]*fresh `tester`[^\n]*never a fixer or the implementer/, name);
+  }
   const build = readSkill('ril-build').body;
-  assert.match(build, /`ril checkpoint --message "Tester version for [^"]*"`/);
-  assert.match(build, /`ril unit set plan-<n>-t<k> --checkpoint <id>`/);
-  assert.match(build, /no implementer or fixer is running/);
-  assert.match(build, PROTECTED_CHECK, 'the FULL reviewer checks the protected entries');
+  assert.match(build, /`ril decision log --stage build --decision "Sealed <task unit>: tests <tree hash>; scripts <values>" --why "tester finished"`/);
+  assert.match(build, /`git rev-parse T:tests\/acceptance`/);
+  assert.match(build, /`git show T:package\.json`/);
+  assert.match(build, /latest seal of that task unit/);
+  assert.ok(!build.includes('--checkpoint <id>`'), 'no tester checkpoint stored on the task unit');
   const verify = readSkill('ril-verify').body;
-  assert.match(verify.slice(at(verify, 'Then the verifiers')), PROTECTED_CHECK, 'the verifier checks the protected entries');
-  assert.match(verify, /implementer or fixer change to a `Protected:` path fails the round/);
+  assert.match(verify, /changed since the seal[^\n]*records `blocked`[^\n]*seal check/);
+  assert.match(verify, /per-fixer checkpoints first[^\n]*batch checkpoint after them/);
+  assert.doesNotMatch(verify, /git log/, 'the verifier runs no protected diff check');
+  assert.doesNotMatch(verify.slice(at(verify, 'Then the verifiers'), at(verify, '**Collect.')), /\bsends?\b/, 'the verifier sends nothing');
 });
 
 test('ril-verify: review per scenario, untrusted kit, one batch per round, no competing fixers', () => {
@@ -560,20 +570,9 @@ test('author role covers every document authors write, from its goal and touch',
   assert.match(r.body, /`goal`[^\n]*`touch`/);
 });
 
-test('protected check: a window from the plan start, restored only by a tester that names the violation', () => {
-  const build = readSkill('ril-build').body;
-  const verify = readSkill('ril-verify').body;
-  for (const [name, body] of [['ril-build', build], ['ril-verify', verify]]) {
-    assert.match(body, PROTECTED_CHECK, name);
-    assert.match(body, /`Protected:` (?:must-fix|violation)[^\n]*fresh `tester`[^\n]*never a fixer/, name);
-    assert.match(body, /`ril checkpoint --message "Tester version restoring <violating version id> for <task unit>"`/, name);
-    for (const gone of ['newest tester version', 'resets the baseline', 'git diff --name-only <newest']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
-  }
-  assert.match(build, /`ril unit set plan-<n> --state doing --checkpoint <the id it printed>`/, 'the plan start is stored on the plan unit');
-});
 
 test('drift regression: fixed and verified within its own plan, then back to the new plan', () => {
-  const rule = /regressed scenario's own plan[^\n]*(?:plan start|its start)[^\n]*task units[^\n]*verifiers run only for the regressed scenarios[^\n]*back to `ril-build` for plan/;
+  const rule = /regressed scenario's own plan[^\n]*its tasks[^\n]*verifiers run only for the regressed scenarios[^\n]*back to `ril-build` for the new plan, not the regressed one/;
   assert.match(readSkill('ril-verify').body, rule);
   assert.match(readSkill('ril-recipe').body, rule);
 });
@@ -599,7 +598,7 @@ test('ril-recipe: the author acceptance list is whole; kit documents rule is its
   const who = body.slice(body.indexOf('**Who writes the kit.**'), body.indexOf('**Kit documents**'));
   has(who, ['`## Self-run`', 'labelled measured, inferred or guess'], 'author acceptance');
   assert.match(body, /\n\n\*\*Kit documents\*\*/);
-  assert.match(body, /regression in an earlier plan's scenario[^\n]*back to `ril-build` for plan/);
+  assert.match(body, /regression in an earlier plan's scenario[^\n]*back to `ril-build` for the new plan/);
 });
 
 test('ril-verify: fix-loop verifiers also cover a regressed earlier scenario', () => {
