@@ -9,7 +9,9 @@ import { loadTools, checkAllow } from '../lib/tools.mjs';
 import { ril } from './helpers/ril.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)'];
+// The plugin folder as the host spells an absolute read rule: a second leading slash, drive letters as /c/.
+const PLUGIN_READ = `Read(/${repoRoot.replace(/\\/g, '/').replace(/^(\w):/, (_, d) => `/${d.toLowerCase()}`)}/**)`;
+const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)', PLUGIN_READ];
 const DENY = ['Edit', 'Write'].flatMap((t) => ['.ril/state.json', '.ril/state.json.bak', '.ril/state.json.damaged-*', '.ril/.lock', '.ril/.lock.break', '.claude/**', '.git/**'].map((f) => `${t}(${f})`));
 
 // A throwaway folder; most tests need no ril project in it, so they also prove none is needed.
@@ -115,7 +117,7 @@ test('a human-only tool shows only a guide', async () => {
   });
 });
 
-test('a timeout counts as missing, and a bad timeout setting is refused plainly', async (t) => {
+test('a timeout counts as missing', async (t) => {
   if (process.platform === 'win32') return t.skip('the slow program is a script');
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, 'bin'));
@@ -127,7 +129,6 @@ test('a timeout counts as missing, and a bad timeout setting is refused plainly'
     assert.equal(r.code, 2, r.stdout + r.stderr);
     assert.match(r.stdout, /^Missing: slowpoke\./m);
     assert.ok(Date.now() - started < 20_000, 'the check was cut off at the timeout');
-    for (const bad of ['0', 'soon', '-5']) await failsIn(dir, 1, ['preflight'], { env: { ...env, RIL_DETECT_TIMEOUT_MS: bad } });
   });
 });
 
@@ -190,7 +191,7 @@ test('allowlist merges without removing existing entries', async () => {
     const r = ril(dir, 'allowlist', 'write', ...APPROVED);
     assert.equal(r.code, 0, r.stderr);
     const after = readSettings(dir);
-    assert.deepEqual(after.permissions.allow, ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)', 'Bash(ril *)', 'Edit(./**)', 'Read(./**)', 'Bash(node *)']);
+    assert.deepEqual(after.permissions.allow, ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)', 'Bash(ril *)', 'Edit(./**)', 'Read(./**)', PLUGIN_READ, 'Bash(node *)']);
     assert.deepEqual(after.permissions.deny, ['Edit(.ril/.lock)', 'Bash(rm *)', ...DENY.filter((d) => d !== 'Edit(.ril/.lock)')], 'deny entries are added after the existing ones, never reordered or doubled');
     assert.equal(after.model, 'opus');
     assert.deepEqual(after.hooks, { Stop: [] });

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { ril } from './helpers/ril.mjs';
+import { git, gitInit } from './helpers/repo.mjs';
 import { commands } from '../lib/commands/index.mjs';
 import { load, mutate, statePath } from '../lib/store.mjs';
 import { oneline, full } from '../lib/render.mjs';
@@ -24,6 +25,15 @@ function folder() {
   return { dir, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
+function inFolder(fn) {
+  const p = folder();
+  try {
+    return fn(p.dir);
+  } finally {
+    p.cleanup();
+  }
+}
+
 function withProject(fn, ...initArgs) {
   const p = folder();
   try {
@@ -39,8 +49,7 @@ const bytes = (file) => fs.readFileSync(file);
 const jargon = /\b(SHA|trunk|head|playbook)\b|head/i;
 
 test('help lists every group', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const r = ril(dir, 'help');
     assert.equal(r.code, 0);
     for (const c of commands) assert.ok(r.stdout.includes(c.name), c.name);
@@ -48,9 +57,7 @@ test('help lists every group', () => {
     const j = JSON.parse(ril(dir, 'help', '--json').stdout);
     assert.deepEqual(j.commands, commands.map((c) => ({ name: c.name, summary: c.summary })));
     assert.ok(ril(dir).stdout.includes('init'), 'no command shows help');
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('every command has name, summary, usage and run', () => {
@@ -78,26 +85,37 @@ test('init creates state and ignore file', () => {
   });
 });
 
+test('Finder and Explorer files are excluded by init in a repo, and by the first checkpoint otherwise, once', () => {
+  inFolder((dir) => {
+    gitInit(dir);
+    for (let i = 0; i < 2; i++) assert.equal(ril(dir, 'init').code, 0);
+    assert.deepEqual(fs.readFileSync(path.join(dir, '.git', 'info', 'exclude'), 'utf8').match(/^(\.DS_Store|Thumbs\.db)$/gm), ['.DS_Store', 'Thumbs.db']);
+  });
+  inFolder((dir) => {
+    assert.equal(ril(dir, 'init').code, 0);
+    assert.ok(!fs.existsSync(path.join(dir, '.git')), 'init does not start a repository');
+    for (const name of ['.DS_Store', 'Thumbs.db', 'app.txt']) fs.writeFileSync(path.join(dir, name), 'x');
+    assert.equal(ril(dir, 'checkpoint').code, 0);
+    assert.equal(git(dir, 'ls-files', '--', '.DS_Store', 'Thumbs.db', 'app.txt'), 'app.txt');
+  });
+});
+
 test('init takes a name and a mode, and rejects a bad mode', () => {
   withProject((dir) => {
     const s = load(dir);
     assert.equal(s.project, 'Shop');
     assert.equal(s.mode, 'guided');
   }, '--name', 'Shop', '--mode', 'guided');
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const r = ril(dir, 'init', '--mode', 'loose');
     assert.equal(r.code, 1);
     assert.match(r.stderr, /Next:/);
     assert.equal(fs.existsSync(path.join(dir, '.ril')), false);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('init routing block preserves user content', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const original = Buffer.from('# My notes\r\n\r\nKeep \xe9 this\r\nno final newline');
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), original);
     assert.equal(ril(dir, 'init').code, 0);
@@ -110,32 +128,24 @@ test('init routing block preserves user content', () => {
 
     assert.equal(ril(dir, 'init').code, 0);
     assert.ok(bytes(path.join(dir, 'CLAUDE.md')).equals(after), 'second init is byte-identical');
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('init replaces only the text between existing markers', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const file = path.join(dir, 'AGENTS.md');
     fs.writeFileSync(file, `top\r\n${START}\r\nold text\r\n${END}\r\nbottom\r\n`);
     assert.equal(ril(dir, 'init').code, 0);
     assert.equal(fs.readFileSync(file, 'utf8'), `top\r\n${START}\r\n${LINE}\r\n${END}\r\nbottom\r\n`);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('init appends after exactly one blank line to a file that ends with a newline', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'hello\n');
     ril(dir, 'init');
     assert.equal(fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8'), `hello\n\n${START}\n${LINE}\n${END}\n`);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('init is idempotent', () => {
@@ -177,15 +187,12 @@ test('init refuses a damaged state file instead of overwriting it', () => {
 });
 
 test('init --json reports what happened', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const first = JSON.parse(ril(dir, 'init', '--json').stdout);
     assert.equal(first.created, true);
     const second = JSON.parse(ril(dir, 'init', '--json').stdout);
     assert.equal(second.created, false);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('status prints one line, the full table with its agents, and json', () => {
@@ -283,24 +290,18 @@ test('progress appends', () => {
 });
 
 test('progress without a project says so', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     const r = ril(dir, 'progress', 'hi');
     assert.equal(r.code, 2);
     assert.match(r.stderr, /Next: run ril init/);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('root prints the plugin root', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     assert.equal(ril(dir, 'root').stdout, `${repoRoot}\n`);
     assert.deepEqual(JSON.parse(ril(dir, 'root', '--json').stdout), { root: repoRoot });
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('bin/ril is executable with a node shebang, and ril.cmd launches it', () => {
@@ -439,8 +440,7 @@ test('a .ril that is a link, not a real folder, is refused', (t) => {
 });
 
 test('CLAUDE.md linked to AGENTS.md inside the project works and the link survives', (t) => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     fs.writeFileSync(path.join(dir, 'AGENTS.md'), 'shared notes\n');
     if (!trySymlink('AGENTS.md', path.join(dir, 'CLAUDE.md'))) return t.skip(NO_LINKS);
     const r = ril(dir, 'init');
@@ -450,9 +450,7 @@ test('CLAUDE.md linked to AGENTS.md inside the project works and the link surviv
     assert.equal(text, `shared notes\n\n${BLOCK()}`);
     assert.equal(ril(dir, 'init').code, 0);
     assert.equal(fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8'), text);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('CLAUDE.md linked to a file outside the project is skipped and unchanged', (t) => {
@@ -475,15 +473,12 @@ test('CLAUDE.md linked to a file outside the project is skipped and unchanged', 
 });
 
 test('a routing file that is not an ordinary file is skipped', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     fs.mkdirSync(path.join(dir, 'CLAUDE.md'));
     const r = ril(dir, 'init');
     assert.equal(r.code, 0, r.stderr);
     assert.match(r.stdout, /I left CLAUDE\.md alone because it is not an ordinary file\./);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('init in a subfolder of a project says a project exists in the parent', () => {
@@ -498,12 +493,9 @@ test('init in a subfolder of a project says a project exists in the parent', () 
     const j = JSON.parse(ril(sub, 'init', '--json').stdout);
     assert.deepEqual(j.notes, []);
   });
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     assert.doesNotMatch(ril(dir, 'init').stdout, /separate one/);
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('two first-time inits at once both succeed', async () => {
@@ -574,8 +566,7 @@ test('flags: --help, --force and --json can come before the command', async () =
 });
 
 test('--help and -h print help and exit 0', () => {
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     for (const args of [['--help'], ['-h'], ['init', '--help'], ['status', '-h']]) {
       const r = ril(dir, ...args);
       assert.equal(r.code, 0, args.join(' '));
@@ -584,9 +575,7 @@ test('--help and -h print help and exit 0', () => {
     assert.match(ril(dir, 'init', '--help').stdout, /Usage: ril init/);
     assert.equal(fs.existsSync(path.join(dir, '.ril')), false, 'help does not run the command');
     assert.ok(ril(dir, '--help').stdout.includes('progress'));
-  } finally {
-    cleanup();
-  }
+  });
 });
 
 test('help text has no process jargon', () => {
@@ -595,10 +584,7 @@ test('help text has no process jargon', () => {
     assert.doesNotMatch(c.summary, words, c.name);
     assert.doesNotMatch(c.usage, words, c.name);
   }
-  const { dir, cleanup } = folder();
-  try {
+  inFolder((dir) => {
     assert.doesNotMatch(ril(dir, 'help').stdout, words);
-  } finally {
-    cleanup();
-  }
+  });
 });

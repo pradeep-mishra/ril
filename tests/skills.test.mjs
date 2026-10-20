@@ -122,7 +122,7 @@ test('verify.md template starts "Trusted: no", so the kit is untrusted until its
     fs.writeFileSync(path.join(kit, 'verify.md'), text);
     assert.equal(kitTrust(p.dir), 'untrusted');
     fs.writeFileSync(path.join(kit, 'verify.md'), text.replace(/^Trusted: no$/m, 'Trusted: yes (abc1234)'));
-    assert.equal(kitTrust(p.dir), 'unshown', 'the line alone is not enough');
+    assert.equal(kitTrust(p.dir), 'untrusted', 'the line alone is not enough');
     assert.equal(kitTrust(p.dir, [{ version: 'abc1234'.padEnd(40, '0'), kit: kitHash(p.dir) }]), 'trusted');
   } finally {
     p.cleanup();

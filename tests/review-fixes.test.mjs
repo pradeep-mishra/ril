@@ -43,16 +43,13 @@ test('kit trust: only "Trusted: yes (<version>)" on the first line, with a self-
       'a later line': '# Verify\n\nTrusted: yes\n',
       'a code fence': '```\nTrusted: yes\n```\n',
       'a comment': '<!-- Trusted: yes -->\n',
-    };
-    for (const [what, text] of Object.entries(untrusted)) assert.equal(trust(text), 'untrusted', what);
-    const unshown = {
       'a bare yes': 'Trusted: yes\n',
       'no line end': 'Trusted: yes',
       'a note that is not a version': 'Trusted: yes (shown failing on a broken copy)\n',
       'a version too short': 'Trusted: yes (abc12)\n',
       'a version with no self-run row': 'Trusted: yes (def5678)\n',
     };
-    for (const [what, text] of Object.entries(unshown)) assert.equal(trust(text), 'unshown', what);
+    for (const [what, text] of Object.entries(untrusted)) assert.equal(trust(text), 'untrusted', what);
     const trusted = {
       'a version': 'Trusted: yes (abc1234)\n',
       'any case': 'trusted: YES (ABC1234)\n',
@@ -61,7 +58,7 @@ test('kit trust: only "Trusted: yes (<version>)" on the first line, with a self-
       'a byte order mark': '\uFEFFTrusted: yes (abc1234)\n',
     };
     for (const [what, text] of Object.entries(trusted)) assert.equal(trust(text), 'trusted', what);
-    assert.equal(kitTrust(p.dir), 'unshown', 'no self-runs at all (an old state)');
+    assert.equal(kitTrust(p.dir), 'untrusted', 'no self-runs at all (an old state)');
   } finally {
     p.cleanup();
   }
