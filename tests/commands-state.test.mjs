@@ -200,20 +200,72 @@ test('rail 3: a scenario criterion is frozen after confirm unless forced with a 
   });
 });
 
-test('rail 3 also holds for a project paused after confirm, and a tried scenario stays as it is', () => {
+test('rail 3 also holds for a project paused after confirm', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
     for (const s of ['design', 'confirm', 'build', 'parked']) ok(dir, 'stage', 'set', s);
     fails(dir, 1, 'scenario', 'update', 'S1', '--criterion', 'x');
   });
+});
+
+// Puts a scenario straight into a status and round, as a verifier and the fix loop would.
+function tried(dir, id, status, round) {
+  const file = path.join(dir, '.ril', 'state.json');
+  const state = JSON.parse(fs.readFileSync(file, 'utf8'));
+  Object.assign(state.scenarios.find((s) => s.id === id), { status, round });
+  fs.writeFileSync(file, JSON.stringify(state));
+}
+
+test('a scenario that was already tried can change only with a reason, and then starts again', () => {
+  for (const status of ['failing', 'proven', 'parked']) {
+    withProject((dir) => {
+      addScenario(dir, 'S1');
+      tried(dir, 'S1', status, 3);
+      const refused = fails(dir, 1, 'scenario', 'update', 'S1', '--criterion', 'x');
+      assert.match(refused.stderr, /Next: .*--force/, status);
+      assert.doesNotMatch(refused.stderr, /new scenario/, status);
+      assert.deepEqual([load(dir).scenarios[0].criterion, load(dir).scenarios[0].status], ['Criterion S1', status]);
+
+      ok(dir, 'scenario', 'update', 'S1', '--criterion', 'new words', '--force', 'the goal moved');
+      const s = load(dir).scenarios[0];
+      assert.deepEqual([s.criterion, s.status, s.round], ['new words', 'unproven', 0], status);
+      assert.equal(load(dir).decisions.length, 1);
+      assert.equal(load(dir).decisions[0].why, 'the goal moved');
+      assert.match(ok(dir, 'decision', 'list').stdout, /the goal moved/);
+    });
+  }
+});
+
+test('one reason covers both a tried scenario and the freeze after confirm, logged once', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
-    const file = path.join(dir, '.ril', 'state.json');
-    const state = JSON.parse(fs.readFileSync(file, 'utf8'));
-    state.scenarios[0].status = 'failing';
-    fs.writeFileSync(file, JSON.stringify(state));
-    const r = fails(dir, 1, 'scenario', 'update', 'S1', '--criterion', 'x', '--force', 'why');
-    assert.match(r.stderr, /Next: /);
+    for (const s of ['design', 'confirm', 'build']) ok(dir, 'stage', 'set', s);
+    tried(dir, 'S1', 'proven', 2);
+    ok(dir, 'scenario', 'update', 'S1', '--method', 'api', '--force', 'wrong way to prove it');
+    const state = load(dir);
+    assert.deepEqual([state.scenarios[0].method, state.scenarios[0].status, state.scenarios[0].round], ['api', 'unproven', 0]);
+    assert.equal(state.decisions.length, 1);
+  });
+});
+
+test('changing only the title of a tried scenario keeps its status', () => {
+  withProject((dir) => {
+    addScenario(dir, 'S1');
+    tried(dir, 'S1', 'proven', 2);
+    fails(dir, 1, 'scenario', 'update', 'S1', '--title', 'new title');
+    ok(dir, 'scenario', 'update', 'S1', '--title', 'new title', '--force', 'typo');
+    const s = load(dir).scenarios[0];
+    assert.deepEqual([s.title, s.status, s.round], ['new title', 'proven', 2]);
+  });
+});
+
+test('scenario update refuses an empty title or criterion', () => {
+  withProject((dir) => {
+    addScenario(dir, 'S1');
+    for (const opt of ['--criterion', '--title', '--method']) {
+      assert.match(fails(dir, 1, 'scenario', 'update', 'S1', opt, '  ').stderr, /Next: /, opt);
+    }
+    assert.equal(load(dir).scenarios[0].criterion, 'Criterion S1');
   });
 });
 
@@ -364,4 +416,84 @@ test('every refusal in these commands says what to do next, and none uses intern
       assert.doesNotMatch(r.stderr, /undefined|\[object|mutate|state\.json/, args.join(' '));
     }
   });
+});
+
+test('a spec file and a feature map that start with a byte order mark still work', () => {
+  withProject((dir) => {
+    const spec = path.join(dir, 'bom.md');
+    fs.writeFileSync(spec, '\uFEFF### S1: A\nCriterion: c\nProof: cli\n\n### S2: B\nCriterion: d\nProof: cli\n\n### S3: C\nCriterion: e\nProof: cli\n');
+    ok(dir, 'scenario', 'import', spec);
+    assert.deepEqual(load(dir).scenarios.map((s) => s.id), ['S1', 'S2', 'S3']);
+    const mapDir = path.join(dir, '.ril', 'docs', 'verification', 'feature-map');
+    fs.mkdirSync(mapDir, { recursive: true });
+    for (const id of ['S1', 'S2', 'S3']) fs.writeFileSync(path.join(mapDir, `${id}.md`), '﻿Method: cli  \r\nmore\r\n');
+    ok(dir, 'scenario', 'coverage');
+  });
+});
+
+test('a criterion that wraps onto the next lines is kept whole', () => {
+  withProject((dir) => {
+    const spec = path.join(dir, 'wrap.md');
+    fs.writeFileSync(spec, [
+      '### S1: Wrapped',
+      '- Criterion: The list command shows',
+      '  every open task,',
+      'oldest first.',
+      '- Proof: cli',
+      'A note after the proof is not part of anything.',
+      '',
+      '### S2: Blank ends it',
+      'Criterion: First line',
+      '',
+      'a separate paragraph',
+      'Proof: api',
+      '',
+    ].join('\r\n'));
+    ok(dir, 'scenario', 'import', spec);
+    const [s1, s2] = load(dir).scenarios;
+    assert.equal(s1.criterion, 'The list command shows every open task, oldest first.');
+    assert.equal(s1.method, 'cli');
+    assert.equal(s2.criterion, 'First line');
+  });
+});
+
+test('a duplicate id in one spec is one problem and nothing is added; a colon in a title is kept', () => {
+  withProject((dir) => {
+    const dup = path.join(dir, 'dup.md');
+    fs.writeFileSync(dup, '### S1: One\nCriterion: a\nProof: cli\n\n### S1: Again\nCriterion: b\nProof: cli\n');
+    const r = fails(dir, 6, 'scenario', 'import', dup);
+    const problems = lines(r.stderr).filter((l) => !l.startsWith('Next:'));
+    assert.equal(problems.length, 1, r.stderr);
+    assert.match(problems[0], /S1.*more than once/);
+    assert.deepEqual(load(dir).scenarios, []);
+
+    const colon = path.join(dir, 'colon.md');
+    fs.writeFileSync(colon, '### S1: Add: a task, quickly\nCriterion: Run it: it works.\nProof: cli\n');
+    ok(dir, 'scenario', 'import', colon);
+    const s = load(dir).scenarios[0];
+    assert.deepEqual([s.title, s.criterion], ['Add: a task, quickly', 'Run it: it works.']);
+  });
+});
+
+test('a refused round bump past the cap leaves the state and its backup untouched', () => {
+  withProject((dir) => {
+    addScenario(dir, 'S1');
+    for (let n = 0; n < 5; n++) ok(dir, 'round', 'bump', 'S1');
+    const file = path.join(dir, '.ril', 'state.json');
+    const before = [fs.readFileSync(file), fs.readFileSync(`${file}.bak`)];
+    fails(dir, 4, 'round', 'bump', 'S1');
+    assert.ok(fs.readFileSync(file).equals(before[0]));
+    assert.ok(fs.readFileSync(`${file}.bak`).equals(before[1]));
+  }, '--cap', '5');
+});
+
+test('a repeat init with a different cap says the cap was kept', () => {
+  withProject((dir) => {
+    const r = ok(dir, 'init', '--cap', '6');
+    assert.equal(load(dir).cap, 5);
+    assert.match(r.stdout, /fix-round limit.*kept at 5/i);
+    assert.equal(lines(r.stdout).filter((l) => /kept at/.test(l)).length, 1);
+    assert.doesNotMatch(ok(dir, 'init', '--cap', '5').stdout, /kept at/);
+    assert.doesNotMatch(ok(dir, 'init').stdout, /kept at/);
+  }, '--cap', '5');
 });
