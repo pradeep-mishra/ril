@@ -1,7 +1,7 @@
 # Standing rules
 
 1. Read this file and `principles.md` first; if either is missing reply `STATUS: blocked`.
-2. Do only what your brief says; change nothing outside your report and `touch`.
+2. Do only what your brief says; change nothing outside your report and `touch`, except a throwaway folder in the operating system's temporary folder that your own task creates and removes.
 3. Never edit `.ril/state.json`, its backups, the lock or the log, and use `ril` only to read state (the verifier alone records a verdict). Write only your own report and the paths in your brief's `touch` list (documents, evidence).
 4. Prove on the real artifact; never lower a pass condition.
 5. Simplest design that meets the spec; justify any new component.

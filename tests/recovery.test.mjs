@@ -237,6 +237,19 @@ test('orphaned doing unit returns to todo', () => {
   });
 });
 
+test('doctor leaves a started plan alone and resets only an orphaned task', () => {
+  withRepo((dir) => {
+    const start = head(dir);
+    mutate(dir, (s) => s.units.push({ id: 'plan-1', kind: 'plan', parent: null, title: 'Plan 1', state: 'doing', checkpoint: start, updated: minutesAgo(1) }));
+    addUnit(dir, 'plan-1-t1');
+    reportsThenFixes(dir, 1, '--new-session');
+    assert.equal(unit(dir, 'plan-1-t1').state, 'todo', 'nothing holds the task, so it starts again');
+    assert.equal(unit(dir, 'plan-1').state, 'doing', 'no agent ever holds a plan; it stays started');
+    assert.equal(unit(dir, 'plan-1').checkpoint, start, 'and keeps its first saved version');
+    settled(dir);
+  });
+});
+
 function proveS1(dir) {
   addScenario(dir, 'S1');
   register(dir, 'V1', 'verifier');

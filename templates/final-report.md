@@ -1,4 +1,4 @@
-<!-- Final report, saved as .ril/docs/reports/final.md in accept mode. Plain words for the person, no ids, hashes or commands except in How to run it; label each claim measured, inferred or guess. Delete this line. -->
+<!-- Final report, saved as .ril/docs/reports/final.md in accept mode. Plain words for the person, no ids, hashes or commands except in How to run it and the evidence path, which appears only as a link in the Evidence column; label each claim measured, inferred or guess. Delete this line. -->
 # What I built for you: <project name>
 
 ## What was built

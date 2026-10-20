@@ -14,7 +14,7 @@ The person's idea becomes software that runs on their machine, with every promis
 **Start, on every invocation.** No `.ril/` folder: start `ril-shape` (it runs `ril init` once it knows the mode); do not run doctor first. Otherwise run `ril doctor --fix --quiet` (add `--new-session` if you have spawned no agent in this conversation) before anything else.
 
 **If `ril` cannot be run** (command not found, or it crashes before printing a plain message), tell the person exactly how to fix it and stop. Exit 2 with "There is no ril project" is not a missing `ril`; it means there is no project yet: start `ril-shape`. Check `node --version` and `command -v ril`, then say the one fix that applies:
-- Node.js is missing or older than 20: "Install Node.js 20 or newer from nodejs.org, then start a new session and type /ril."
+- Node.js is missing or older than 20.10: "Install Node.js 20.10 or newer from nodejs.org, then start a new session and type /ril."
 - `ril` is not found: "Make sure the ril plugin is installed and turned on, then start a new session and type /ril."
 - `ril` is found outside `${CLAUDE_PLUGIN_ROOT}/bin`: "Another program called ril is ahead of this one on your PATH. Rename or remove it, then start a new session."
 - The file exists but will not start (macOS or Linux): "Run `chmod +x "${CLAUDE_PLUGIN_ROOT}/bin/ril"`, then type /ril again."
@@ -56,7 +56,7 @@ Do nothing else until it runs.
 **Coming back after a gap** (a new session, or the person returns after work ran without them), open in this order:
 1. One sentence saying what is waiting on them, or that nothing is.
 2. What changed since they last looked, in plain words (from `.ril/log.md` and `ril status`).
-3. "Decisions I made for you": each decision from `ril decision list` newer than the last "Caught the person up." line in `.ril/log.md` (all of them if there is none), and what they could have said instead. List only choices made for the person: skip decisions whose text begins `ril doctor:`, `Sealed`, `Carried`, `Moved the project` or `Changed the`. Sum recovery up in one plain line, "After the stop I repaired N things" (N: the `ril doctor:` decisions and a restored state among them); never show ids, hashes or commands.
+3. "Decisions I made for you": each decision from `ril decision list` newer than the last "Caught the person up." line in `.ril/log.md` (all of them if there is none), and what they could have said instead. List only choices made for the person: skip decisions whose text begins `ril doctor:`, `Sealed`, `Carried`, `Moved the project`, `Changed the`, `Restored the project state`, `Proof kit trusted at` or `Started scenario`. Sum recovery up in one plain line, "After the stop I repaired N things" (N: the `ril doctor:` decisions and a restored state among them); never show ids, hashes or commands.
 4. Every item waiting on them, each decidable from the message alone, with your pick.
 Never invent a decision; list only what `ril decision list` holds. After telling them, run `ril progress "Caught the person up."`.
 

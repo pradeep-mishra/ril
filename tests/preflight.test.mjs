@@ -9,7 +9,7 @@ import { ril } from './helpers/ril.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)'];
-const DENY = ['Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(.ril/state.json.damaged-*)', 'Edit(.ril/.lock)', 'Edit(.ril/.lock.break)'];
+const DENY = ['Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(.ril/state.json.damaged-*)', 'Edit(.ril/.lock)', 'Edit(.ril/.lock.break)', 'Edit(.claude/**)', 'Edit(.git/**)'];
 const NPM = ['Bash(npm test)', 'Bash(npm test *)', 'Bash(npm run verify)', 'Bash(npm run verify *)'];
 const INSTALL = ['Bash(npm install *)', 'Bash(npm ci)', 'Bash(npm pack *)'];
 
@@ -56,7 +56,7 @@ function recipe(dir, tools, extra = {}, name = 'recipe') {
 const tool = (name, detect, extra = {}) => ({ name, detect, install: {}, guide: `Install ${name} from its website.`, human: false, ...extra });
 const MISSING = tool('definitely-not-installed-xyz', 'definitely-not-installed-xyz --version', { install: { [process.platform]: 'echo installing' } });
 const PRESENT = tool('node', 'node --version');
-const IDENTITY_GUIDE = 'Run these two commands inside your project folder, with your own name and email (this only affects this project): git config user.name "Your Name" and git config user.email "you@example.com"';
+const IDENTITY_GUIDE = 'Run these three commands inside your project folder, with your own name and email (this only affects this project): git init, then git config user.name "Your Name" and git config user.email "you@example.com"';
 // An environment where git reads only the given text as its user settings (no system or home settings).
 function gitConfig(dir, text) {
   const file = path.join(dir, 'gitconfig');
@@ -356,6 +356,7 @@ test('the CLI recipe pack is complete and works with preflight and allowlist', a
   assert.deepEqual(identity.install, { darwin: null, win32: null, linux: null });
   assert.equal(identity.guide, IDENTITY_GUIDE);
   assert.doesNotMatch(identity.guide, /--global/);
+  assert.match(identity.guide, /: git init, then git config user\.name /, 'a new folder is not a git repository yet, so the guide starts with git init');
   assert.deepEqual(pack.allowlist.claude, ['Bash(node *)', ...NPM, ...INSTALL, 'Bash(git *)']);
   assert.ok(!pack.allowlist.claude.includes('Bash(npm *)'), 'npm publish and exec are not pre-approved');
 

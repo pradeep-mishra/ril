@@ -11,12 +11,18 @@ unit tests is not proof.
   version of the code you are proving).
 
 ## Launching
-1. Make a clean temporary directory outside the project (for example with `mkdtemp`). Never run the
-   program inside the project folder, so stray files cannot hide a bug or leak into the project.
-2. Install or link the project into that directory the way a person would get it (for example
-   `npm pack`, then install the tarball there). Run the command by its real name, not by calling
-   internal files.
-3. Start from nothing: no config, no data, no leftovers from an earlier run.
+Use only commands the permissions allow, so a background run never stops to ask: make, fill and remove
+the temporary folder with `node -e` and `npm`, never with other shell tools or the Write tool.
+1. Make a clean temporary folder outside the project and note the path it prints (`<tmp>` below):
+   `node -e "const fs=require('fs'),os=require('os'),path=require('path');console.log(fs.mkdtempSync(path.join(os.tmpdir(), 'ril-')))"`.
+   Never run the program inside the project folder, so stray files cannot hide a bug or leak into the project.
+2. Install the project there the way a person gets it: `npm pack --pack-destination <tmp>` (it prints the
+   tarball's name), then `npm install --prefix <tmp> <tmp>/<tarball>`.
+3. Run the program as `node <tmp>/node_modules/.bin/<name> ...`, where `<name>` is its command in
+   `package.json` `bin`. This counts as running it by its real name: it is the installed command a person
+   gets, not an internal file. (On Windows that path is a shell wrapper; run
+   `node <tmp>/node_modules/<package>/<the file its bin names>` instead.)
+4. Start from nothing: no config, no data, no leftovers from an earlier run.
 
 ## Driving
 1. Run the commands the scenario describes, one at a time, with realistic input.
@@ -47,6 +53,7 @@ number as `--checks` when you record.
 - If the number is lower than last time and the feature map did not shrink, say so in your report.
 
 ## Cleaning up
-- Remove the temporary directory and anything you installed into it.
+- Remove the temporary folder and everything installed into it:
+  `node -e "const fs=require('fs');fs.rmSync('<tmp>', { recursive: true, force: true })"`.
 - Keep `.ril/evidence/` as it is; that is the proof.
 - Confirm the project folder has no new files except the evidence (`git status`).

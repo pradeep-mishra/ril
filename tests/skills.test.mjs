@@ -688,7 +688,8 @@ test('final report template: the five plain headings, at most 30 lines', () => {
 test('ril-shape asks plainly before installing libraries; no means no dependencies', () => {
   const shape = readSkill('ril-shape').body;
   assert.match(shape, /install the libraries the project needs \(this lets the workers run `npm install` and `npm ci`, which can download and run other people's code\)/);
-  assert.match(shape, /If the person says no[^\n]*no dependencies[^\n]*not to install anything/);
+  assert.match(shape, /If the person says no[^\n]*no dependencies[^\n]*"do not add libraries"/);
+  assert.doesNotMatch(shape, /not to install anything/, 'the proof kit still installs the packed project into a throwaway folder');
   assert.match(readSkill('ril-design').body, /default stack has no dependencies unless a need is justified/);
 });
 
@@ -728,6 +729,39 @@ test('decisions.md: at most 90 lines, with every updated row and limit', () => {
   assert.ok(f.lines <= 90, `${f.lines} lines`);
   has(f.text, ['no proof kit', 'first line', 'under `.ril/evidence/`', '`round reset`', 'at least one scenario is proven',
     'a later change no longer demotes', 'deny', 'only the Edit tool', '`Bash(node *)`', 'Sealed at', '`git diff --quiet`',
-    'registering a fake verifier', '`Edit(./**)`', 'no signing'], f.file);
+    'registering a fake verifier', '`Edit(./**)`', 'no signing', '`Edit(.claude/**)`', '`Edit(.git/**)`'], f.file);
   assert.doesNotMatch(f.text, /changed product/, 'doctor no longer demotes for a changed product');
+});
+
+test('the verifier makes, copies and removes its temporary folder only with allowed commands', () => {
+  for (const rel of ['recipes/cli/recipe.md', 'templates/verify.md']) {
+    const { text } = readFile(rel);
+    for (const want of ['node -e', '--prefix']) assert.ok(text.includes(want), `${rel} lacks ${want}`);
+    for (const gone of ['mktemp', 'cp -r', 'rm -rf']) assert.ok(!text.includes(gone), `${rel} still says ${gone}`);
+  }
+  const recipe = readFile('recipes/cli/recipe.md').text;
+  has(recipe, ['fs.mkdtempSync(path.join(os.tmpdir(), \'ril-\'))', 'fs.rmSync', 'npm pack --pack-destination', 'node <tmp>/node_modules/.bin/<name>', 'counts as running it by its real name'], 'recipe.md');
+  assert.ok(readFile('templates/verify.md').text.includes('fs.cpSync'), 'verify.md copies with node');
+  assert.match(readFile('templates/standing-rules.md').text, /^2\. [^\n]*operating system's temporary folder[^\n]*your own task/m);
+});
+
+test('the git identity guide starts with git init in the README and the runbook', () => {
+  assert.match(readFile('README.md').text, /`git init`, then `git config user\.name "Your Name"` and `git config user\.email "you@example\.com"`/);
+  assert.match(readFile('tests/e2e/RUNBOOK.md').text, /`git init` and the project-local `git config user\.name` and `git config user\.email`/);
+});
+
+test('last review items: catch-up skips, node wording, task checkpoint, no plan left, missing seal file, control, final report', () => {
+  const front = readSkill('ril').body;
+  for (const lead of ['`Restored the project state`', '`Proof kit trusted at`', '`Started scenario`']) assert.ok(front.includes(lead), lead);
+  assert.match(front, /older than 20\.10/);
+  assert.match(readSkill('ril-verify').body, /`ril unit set plan-<n>-t<k> --state verified --checkpoint <V>`/);
+  const build = readSkill('ril-build').body;
+  assert.match(build, /no plan is left to build[^\n]*`ril-verify` in accept mode[^\n]*stop-and-park/);
+  assert.match(build, /a file missing at <T> counts as a difference/);
+  const control = readSkill('ril-control').body;
+  assert.match(control, /Collect each finished agent as soon as it reports/);
+  assert.doesNotMatch(control, /in batches/);
+  assert.match(control, /`ril gate park <id> [^\n]*`<id>` is the worker's agent id/);
+  const report = readFile('templates/final-report.md').text.split('\n')[0];
+  assert.match(report, /evidence path[^\n]*link/i);
 });

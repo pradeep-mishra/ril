@@ -5,7 +5,7 @@ Step 3 is automated. This runbook is how milestone 1 is accepted.
 
 ## 1. Run RIL on the todo list idea (manual)
 
-1. Make an empty folder and go into it. Do not run `git init`; `ril checkpoint` creates the repository. Git must know your name and email, globally or set for this project by the guide RIL shows.
+1. Make an empty folder and go into it. Do not run `git init` up front; `ril checkpoint` creates the repository when there is none. Git must know your name and email, globally or set for this project by the guide RIL shows (it starts with `git init`, which is fine).
 2. Start Claude Code with the plugin: `claude --plugin-dir <path to this repo>`.
 3. Type `/ril`.
 4. Paste the text in `tests/e2e/todo-cli.idea.md`.
@@ -47,6 +47,6 @@ Mark each one in the run log once you have seen it work.
 - Whether allowlist entries written into the project settings in the middle of a session take effect without a restart.
 - Workers edit product files without a prompt (the `Edit(./**)` allow rule), also when Claude Code was started from a subfolder of the project.
 - The deny rules really block a worker from editing `.ril/state.json`: try asking a worker to edit .ril/state.json with the Edit tool and confirm it is refused; note that a `node` command could still write it (the deny rules stop accidents, not a determined agent).
-- The git identity guide works on a machine without a global git identity: the project-local `git config user.name` and `git config user.email` lines let `ril checkpoint` save.
+- The git identity guide works in a new folder on a machine without a global git identity: `git init` and the project-local `git config user.name` and `git config user.email` lines let `ril checkpoint` save.
 - The Windows launcher `bin/ril.cmd`.
 - A first real install of the plugin, and whether a bare `ril` works from the shell afterwards.

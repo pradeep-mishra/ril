@@ -9,8 +9,8 @@ It asks you a few questions, writes down what the program must do, builds it tes
 
 - Claude Code.
 - Node.js 20.10 or newer.
-- git, with your name and email set for the project. If git does not know them yet, RIL shows you the two commands to set them for that project only:
-  `git config user.name "Your Name"` and `git config user.email "you@example.com"`.
+- git, with your name and email set for the project. If git does not know them yet, RIL shows you the three commands to set them for that project only:
+  `git init`, then `git config user.name "Your Name"` and `git config user.email "you@example.com"`.
 
 ## Install
 
