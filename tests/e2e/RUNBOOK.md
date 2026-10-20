@@ -39,12 +39,23 @@ For every place the run needed a human, stalled, or needed an extra rule, add a 
 Name the failure you saw, not a guess about its cause, and say what was changed. Add a new rule only for a failure that repeated.
 If a step above could not be done, say that in the log too.
 
+## Gate before R2 merges to develop (manual)
+
+R2 writes the permission rules mid-session. Check once that Claude Code applies them without a restart.
+
+1. In an empty folder, start a session with the plugin and run `ril init`.
+2. In that same session run `ril allowlist write --base --tool claude`. Do not restart. Accept the trust prompt if one appears.
+3. In the same session ask for a small file edit, then ask for a `git status`.
+4. Note whether any permission prompt appeared for the edit or for `git status`, and add the result to the Run log in `docs/decisions.md`.
+
+If a prompt appears, the rules do not apply mid-session. Then approval must happen before the build session starts: the design stage writes and approves the tool list, runs `ril allowlist write --approved --tool claude`, ends the session, and asks the person to type `/ril` in a new one. Change the skills to say so before R2 merges.
+
 ## What cannot be tested here (owner re-checks)
 
 Mark each one in the run log once you have seen it work.
 
 - Typing `/ril` in an interactive session. The spike only measured it with `claude -p`.
-- Whether allowlist entries written into the project settings in the middle of a session take effect without a restart.
+- Whether allowlist entries written into the project settings in the middle of a session take effect without a restart (the gate above).
 - Workers edit product files without a prompt (the `Edit(./**)` allow rule), also when Claude Code was started from a subfolder of the project.
 - The deny rules really block a worker from editing `.ril/state.json`: try asking a worker to edit .ril/state.json with the Edit tool and confirm it is refused; note that a `node` command could still write it (the deny rules stop accidents, not a determined agent).
 - The git identity guide works in a new folder on a machine without a global git identity: `git init` and the project-local `git config user.name` and `git config user.email` lines let `ril checkpoint` save.
