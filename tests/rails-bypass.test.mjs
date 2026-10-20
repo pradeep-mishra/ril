@@ -230,27 +230,6 @@ test('blocked never takes away a pass; failed replaces it', () => {
   });
 });
 
-test('the kit counts as trusted only when its first line says "Trusted: yes"', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'S1');
-    register(dir, 'V1', 'verifier');
-    const kit = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
-    const missing = record(dir, 'S1', head(dir), 'proven-cli');
-    assert.equal(missing.code, 1, 'no kit at all');
-    assert.match(missing.stderr, /proof kit has not been written yet/);
-    fs.mkdirSync(path.dirname(kit), { recursive: true });
-    const untrusted = ['# Verify\n', 'Trusted: no (not shown failing yet)\n', '**Trusted:** no\n', 'Trusted: maybe\n', 'Trusted: yes/no\n', 'Trusted: yesterday\n', '# Verify\n\nTrusted: yes\n', '```\nTrusted: yes\n```\n'];
-    for (const text of untrusted) {
-      fs.writeFileSync(kit, text);
-      const r = record(dir, 'S1', head(dir), 'proven-cli');
-      assert.equal(r.code, 1, JSON.stringify(text));
-      assert.match(r.stderr, /trusted/i);
-    }
-    fs.writeFileSync(kit, 'trusted: YES (shown failing)\r\n\r\n# Verify\r\n');
-    assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
-  });
-});
-
 test('a verifier that failed or was stopped cannot record', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');

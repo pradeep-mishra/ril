@@ -214,7 +214,7 @@ test('status line reflects plans, scenarios, rounds and open questions', () => {
   for (const w of ['implementer', 'write the parser', 'working', 'demo', 'in progress']) assert.ok(text.includes(w), w);
 });
 
-test('status --full prints the agent table and rewrites status.md', () => {
+test('status --full prints the agent table', () => {
   withProject((dir) => {
     mutate(dir, (s) => {
       s.agents.push({ id: 'a1', role: 'tester', unit: 'p1', task: 'write tests', state: 'done', result: '3 tests written', started: 't', updated: 't' });
@@ -223,7 +223,6 @@ test('status --full prints the agent table and rewrites status.md', () => {
     assert.equal(r.code, 0, r.stderr);
     for (const w of ['tester', 'write tests', 'finished', '3 tests written']) assert.ok(r.stdout.includes(w), w);
     assert.doesNotMatch(r.stdout, jargon);
-    assert.equal(fs.readFileSync(path.join(dir, '.ril', 'status.md'), 'utf8'), r.stdout);
   });
 });
 
@@ -423,23 +422,6 @@ test('a symlinked log.md is refused and the file it points to is unchanged', (t)
       fs.rmSync(path.join(dir, '.ril', 'log.md'));
       if (!trySymlink(target, path.join(dir, '.ril', 'log.md'))) return t.skip(NO_LINKS);
       const r = ril(dir, 'progress', 'hello');
-      assert.equal(r.code, 1);
-      assert.match(r.stderr, /Next:/);
-      assert.equal(fs.readFileSync(target, 'utf8'), 'keep');
-    } finally {
-      outside.cleanup();
-    }
-  });
-});
-
-test('a symlinked status.md is refused and the file it points to is unchanged', (t) => {
-  withProject((dir) => {
-    const outside = folder();
-    try {
-      const target = path.join(outside.dir, 'outside.txt');
-      fs.writeFileSync(target, 'keep');
-      if (!trySymlink(target, path.join(dir, '.ril', 'status.md'))) return t.skip(NO_LINKS);
-      const r = ril(dir, 'status', '--full');
       assert.equal(r.code, 1);
       assert.match(r.stderr, /Next:/);
       assert.equal(fs.readFileSync(target, 'utf8'), 'keep');

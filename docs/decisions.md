@@ -25,8 +25,8 @@ a real run, and the failure is named in the Run log below.
 | The allowlist deny entries (`Edit(...)` and `Write(...)` for `.ril/state.json`, its backups and the lock files, plus `.claude/**` and `.git/**` for the permission settings and git hooks) stop only those two tools from writing those files, so they prevent accidents. A worker running `node` or `git` can still write them | Host-enforced, unmeasured: an owner re-check in `tests/e2e/RUNBOOK.md`. The entries themselves: `tests/preflight.test.mjs` |
 | A stuck item is set aside with a reason and the rest carries on | CLI: `ril skip`. Test: `tests/recovery.test.mjs` |
 | A finished real run ends in a state that meets every acceptance condition | Test of the checker: `tests/e2e/check-state.test.mjs`. The real run itself is manual (`tests/e2e/RUNBOOK.md`) |
-| Protected acceptance tests: implementers and fixers never edit them, only a tester does | Skill instruction only (`ril-build`, `ril-recipe`) |
-| The seal: after each tester the controller saves a version T and logs "Sealed at <T> for <task unit>"; after every implementer or fixer it checks the last one with `git diff --quiet` on `tests/acceptance` and the verify script, and compares the six script values in `package.json`; a difference goes to a fresh tester | Skill instruction and controller bookkeeping with git (`ril-build`, `ril-verify`). No CLI rail |
+| Protected acceptance files: the second line of `.ril/docs/verification/verify.md` is `Protected: <path>, <path>` (paths inside the project). `ril checkpoint --seal` records each path's git id in `state.seals`. `ril ledger record proven-*` is refused when a protected path differs from the last seal, when none is sealed yet, or when a path is outside the project; a plain `ril checkpoint` and `ril status --full` print a line when they differ. A fresh tester restores the files (skill instruction) | CLI rail: `ril ledger record`, `ril checkpoint --seal`. Tests: `tests/seal.test.mjs` |
+| Budget raised: `engineLines` 2551 to 2606 for the seal rail (+55 net lines, R2 task 5); verification rails are the heavy part. `.ril/status.md` (unused) was deleted. R6 lowers totals again | Test: `tests/charter.test.mjs` |
 | Workers never change state; only the verifier records a result | Skill instruction only (standing rules). The allowlist entry `Bash(ril *)` lets any agent run any `ril` command |
 | The verifier is independent of the builders | Rail 1 needs a registered agent whose role is `verifier`, but anyone can register one. Skill instruction only |
 | `ril-control` rules: only fresh workers with a full brief; never spawn an unregistered agent; never review a diff yourself; refuse roles outside the six | Skill instruction only (`ril-control`). The CLI refuses an unknown role at `ril agent register` |
@@ -47,7 +47,7 @@ a real run, and the failure is named in the Run log below.
 
 These rules are only an instruction to an agent, or nothing yet. A model that ignores them is not stopped by RIL.
 
-- Protected acceptance tests and the seal: nothing in the CLI looks at them.
+- The seal: any agent that can run `ril checkpoint --seal` can reseal changed files, or edit the `Protected:` line of `verify.md` or `state.json`; only a restored file is checked, who restored it is not.
 - Workers changing state: `Bash(ril *)` still lets any agent run any `ril` command, including registering a fake verifier.
 - Verifier independence: anyone can register an agent with the role `verifier`.
 - The allowlist grants `Edit(./**)` and `Bash(node *)` (and `Bash(git *)`, `Bash(npm install *)`), which let workers run and change the project they build. The deny entries stop only the Edit tool from writing the state files; a worker running `node` or `git` can still write them. State integrity against a determined agent is not protected: there is no signing and no state kept outside the project.

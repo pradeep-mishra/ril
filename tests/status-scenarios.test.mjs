@@ -44,7 +44,7 @@ test('status --full says so when there are no scenarios', () => {
   assert.equal(lines[at + 3], 'Agents:');
 });
 
-test('the CLI shows an added scenario in status --full and status.md', () => {
+test('the CLI shows an added scenario in status --full', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-scn-'));
   try {
     assert.equal(ril(dir, 'init').code, 0);
@@ -53,7 +53,6 @@ test('the CLI shows an added scenario in status --full and status.md', () => {
     const r = ril(dir, 'status', '--full');
     assert.equal(r.code, 0, r.stderr);
     assert.match(r.stdout, /^ {2}S1 {2}t - not proven yet$/m);
-    assert.equal(fs.readFileSync(path.join(dir, '.ril', 'status.md'), 'utf8'), r.stdout);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
