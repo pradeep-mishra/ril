@@ -224,13 +224,17 @@ test('the three stage skills exist, within 120 lines, with the five parts', () =
   assert.ok(skillNames().length <= 8, 'at most 8 skills');
 });
 
+const MODE_LOOKUP = 'the mode is on the first line of `ril status --full`';
+const GUIDED_CHANGE = 'On "change it", a fresh `author` makes the change';
+const LIGHT = 'must-fix only for a contradiction, an unprovable criterion or a missing case; everything else is noted; invent no risks';
+const FULL = 'edge inputs, misuse, empty state, repeated actions, interruption, security, needless complexity';
+
 test('ril-shape: asks the mode before init, command-line only, provable spec', () => {
   const { body, file } = readSkill('ril-shape');
-  has(body, ['my assumption', 'Needs a person', '## Later', 'one question at a time', 'play the idea back', 'what is wrong',
-    'simplest stack', 'observe it instead', '`ril scenario import .ril/docs/spec.md`', '`Criterion:`', '`Proof: cli`',
-    'ui, api, cli and golden', '.ril/docs/intake.md', '`ril-review`', '`ril-control`', 'install it for you, or guide you step by step',
-    'trust this folder', '`ril stage set design`'], file);
-  has(body, ['`ril preflight ${CLAUDE_PLUGIN_ROOT}/recipes/cli`', '`ril allowlist write --base --tool claude`',
+  has(body, ['my assumption', 'Needs a person', '## Later', 'one question at a time', '`ril scenario import .ril/docs/spec.md`',
+    '`Criterion:`', '`Proof: cli`', 'ui, api, cli and golden', '.ril/docs/intake.md', '`ril-review`', '`ril-control`',
+    'install it for you, or guide you step by step', '`ril stage set design`'], file);
+  has(body, ['`ril preflight ${CLAUDE_PLUGIN_ROOT}/recipes/cli`',
     '`ril allowlist write --recipe ${CLAUDE_PLUGIN_ROOT}/recipes/cli --tool claude`'], file);
   for (const cmd of ['init', 'scenario', 'gate', 'decision', 'preflight', 'allowlist', 'progress', 'stage']) {
     assert.ok(rilCommandsIn(body).includes(cmd), `${file} never mentions ril ${cmd}`);
@@ -239,12 +243,35 @@ test('ril-shape: asks the mode before init, command-line only, provable spec', (
   const init = body.indexOf('`ril init --mode');
   assert.ok(mode >= 0 && init > mode, 'the mode is asked before ril init runs');
   assert.match(body, /Autonomous[^\n]*default/);
-  assert.match(body, /Guided/);
+  assert.match(body, /what it should do, how it is put together, and the order I build it in/);
   assert.match(body, /command-line programs only/);
   assert.match(body, /web page, a phone app or a desktop window/);
   assert.match(body, /stop there/);
+  assert.match(body, /the next \/ril resumes in shape/);
   assert.doesNotMatch(body, /Proof:\s*human/i, 'never a human proof');
-  assert.match(body, /target and stack[^\n]*spec|spec[^\n]*target and stack/i, 'guided sign-offs');
+});
+
+test('ril-shape: wrong folder stops before init; base allowlist before the first spawn', () => {
+  const { body } = readSkill('ril-shape');
+  const folder = body.indexOf('open a new session in it and type /ril, then stop');
+  const init = body.indexOf('`ril init --mode');
+  assert.ok(folder >= 0 && folder < init, 'the folder check comes before init');
+  const base = body.indexOf('`ril allowlist write --base --tool claude`');
+  const trust = body.indexOf('trust this folder');
+  const spawn = body.indexOf('Spawn an `author`');
+  assert.ok(init >= 0 && base > init, 'base allowlist after init');
+  assert.ok(trust > base && spawn > trust, 'trust message after the base allowlist, both before the first spawn');
+  assert.ok(base < body.indexOf('**The interview'), 'base allowlist before the intake');
+});
+
+test('stage skills read the mode from ril status --full', () => {
+  for (const name of STAGE_SKILLS) assert.ok(readSkill(name).body.includes(MODE_LOOKUP), name);
+});
+
+test('guided change: a fresh author, a light review again, the controller never edits the spec', () => {
+  const shape = readSkill('ril-shape').body;
+  has(shape, [GUIDED_CHANGE, 'reviewed again at the light level', 'never edits the spec itself', 'does not ask again'], 'ril-shape');
+  assert.ok(readSkill('ril-design').body.includes(GUIDED_CHANGE), 'ril-design');
 });
 
 test('ril-design: simple design, red flags, proof kit first, plans and the brief', () => {
@@ -254,27 +281,40 @@ test('ril-design: simple design, red flags, proof kit first, plans and the brief
     'shallow module', 'one decision leaked into several modules', 'two modules writing the same state', 'two ways to do one task',
     'internals other code can import', 'a list kept by hand in two places', 'linter, type check, formatter', '`verify` command',
     'how many it ran', '`ril-recipe`', 'before any code', '`ril unit add plan-<n> --kind plan', 'one agent', '`ril-review`',
-    'Accepted as unproven: <id>', '`ril scenario update', 'templates/project-brief.md', '.ril/docs/brief.md', '`author`'], file);
+    'Accepted as unproven: <id>', '`ril scenario update', 'templates/project-brief.md', '<project>/.ril/docs/brief.md', '`author`'], file);
   const brief = body.indexOf('templates/project-brief.md');
   const confirm = body.indexOf('`ril stage set confirm`');
   assert.ok(brief >= 0 && confirm > brief, 'the brief is written before the stage moves to confirm');
   assert.match(body, /rewrite it\|accept it unproven\|drop it/);
-  assert.match(body, /design[^\n]*plan list/i, 'guided sign-offs');
+  assert.match(body, /The brief itself is reviewed by `ril-review` at the light level/);
+  assert.match(body, /every accepted risk and every criterion accepted as unproven/);
 });
 
-test('ril-review: only the artifact and the spec, triage in RESULT, round caps', () => {
+test('ril-design: a set-aside scenario still gets a feature map, never ril-recipe again', () => {
+  const { body } = readSkill('ril-design');
+  assert.match(body, /after `ril skip <id> --scenario[^\n]*feature map[^\n]*`Method: <its method>`[^\n]*set aside and why/);
+  assert.match(body, /never run `ril-recipe` again for a set-aside scenario/i);
+});
+
+test('ril-review: only the artifact and the spec, triage in RESULT, two levels, round caps', () => {
   const { body, file } = readSkill('ril-review');
   has(body, ['only the artifact and the spec', 'never the author', 'must-fix', 'noted', 'RESULT', 'not STATUS', '`STATUS: done`',
-    'fresh `author`', 'never a resumed one', 'fresh reviewer', 'at most 2 rounds', 'at most 3 rounds', 'never invent',
-    'Accepted risk for <id or artifact>', '`ril decision log', 'plainly', '`ril-control`'], file);
-  assert.match(body, /missing cases, contradictions, needless complexity, security/);
+    'fresh `author`', 'never a resumed one', 'fresh reviewer', 'at most 2 rounds', 'at most 3 rounds',
+    'Accepted risk for <id or artifact>', '`ril decision log', 'plainly', '`ril-control`', '`<project>/.ril/docs/spec.md`',
+    'the fix author gets the intake in the spec\'s place', '`--stage` is the current stage from `ril stage get`'], file);
+  assert.doesNotMatch(body, /\(`\.ril\/docs\//, 'project paths are absolute');
+  assert.match(body, new RegExp(`LIGHT, for a spec, design or plan[^\\n]*${LIGHT.replace(/[;]/g, '.')}`));
+  assert.match(body, new RegExp(`FULL, for built code and the running program[^\\n]*${FULL}`));
 });
 
-test('project brief template: one page, plain, links and the go line', () => {
+test('project brief template: one page, plain, links, accepted risks and the go line', () => {
   const f = readFile('templates/project-brief.md');
   assert.ok(f.lines <= 30, `${f.lines} lines`);
   has(f.text, ['(spec.md)', '(design.md)', '(plans/plan-1.md)', 'My assumptions', 'What it will not do', 'What I need from you',
     'Where it runs and what it is built with', 'Reply **go** to start building, or tell me what to change.'], f.file);
+  const need = f.text.slice(f.text.indexOf('## What I need from you'), f.text.indexOf('## Where to read more'));
+  assert.match(need, /risk accepted at a review cap/);
+  assert.match(need, /accepted as unproven/);
 });
 
 test('carried fixes: verifier review none, spawn reset only for units, absolute evidence touch', () => {

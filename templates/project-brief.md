@@ -18,6 +18,7 @@
 
 ## What I need from you
 - <Anything only you can do or decide, or "Nothing.">
+- <Each risk accepted at a review cap, and each promise accepted as unproven, in plain words.>
 
 ## Where to read more
 [The spec](spec.md) · [The design](design.md) · [Plan 1: <title>](plans/plan-1.md) · <one link per plan>

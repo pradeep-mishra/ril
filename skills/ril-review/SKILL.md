@@ -13,28 +13,28 @@ One artifact has been attacked by a reviewer that did not write it, every findin
 
 **What you are given.** The calling skill names the artifact (its paths), its kind (spec, design, plan, built code, or the running program) and its unit (`shape`, `design`, `plan-<n>`, or a scenario id).
 
-**How hard.**
-- A spec, design or plan: light. Only contradictions, unprovable criteria and missing cases are must-fix; never invent risks; at most 2 rounds.
-- Built code or the running program: full adversarial effort: edge inputs, misuse, empty state, repeated actions, interruption, security, needless complexity, each finding reproduced where it can be; at most 3 rounds.
+**How hard.** The reviewer sees only its brief, so copy exactly one of these two lines into its `acceptance`:
+- LIGHT, for a spec, design or plan (at most 2 rounds): "must-fix only for a contradiction, an unprovable criterion or a missing case; everything else is noted; invent no risks."
+- FULL, for built code and the running program (at most 3 rounds): "full adversarial effort: try to break it with edge inputs, misuse, empty state, repeated actions, interruption, security, needless complexity; reproduce each finding where you can; must-fix is anything that breaks a promise, contradicts the spec, is unsafe or cannot be proven."
 
 **Spawn the reviewer.** Spawn a fresh `reviewer` through `ril-control`, for the unit you were given. Its brief:
-- `inputs`: only the artifact and the spec (`.ril/docs/spec.md`), plus the report format. When the artifact is the spec itself, the intake (`.ril/docs/intake.md`, the person's own answers) takes the spec's place. It is never the author's notes, its report, or earlier reviews: the reviewer judges the work, not the story about it.
+- `inputs`: only the artifact and the spec (`<project>/.ril/docs/spec.md`), plus the report format. When the artifact is the spec itself, the intake (`<project>/.ril/docs/intake.md`, the person's own answers) takes the spec's place. It is never the author's notes, its report, or earlier reviews: the reviewer judges the work, not the story about it.
 - `touch`: `<project>/.ril/agents/<id>/findings.md` and its own `report.md`.
-- `goal`: try to break the artifact, at the level above.
+- `goal`: try to break the artifact: missing cases, contradictions, needless complexity, security, anything unprovable.
 - `acceptance`, copied in:
-  - It looks for missing cases, contradictions, needless complexity, security holes, and anything that cannot be proven by running the real thing.
-  - It triages its own findings: must-fix (breaks a promise, contradicts the spec, is unsafe, or cannot be proven) or noted, each with a one-line reason.
+  - The LIGHT or FULL line above, word for word.
+  - It triages its own findings by that line: each one must-fix or noted, with a one-line reason.
   - `findings.md` lists every finding with its tag, its reason and where it is; the report lists `findings.md` under EVIDENCE.
   - A finished review reports `STATUS: done` with RESULT starting `must-fix: N, noted: M`.
 
 **Read the result.** When `ril-control` collects the reviewer, decide on RESULT, not STATUS. `STATUS: done` with `must-fix: 0` is clean. `STATUS: done` with must-fix above 0 is a fix round, never a retry. `STATUS: failed` or `blocked` follows `ril-control`'s retry and blocked rules, and does not count as a round. Log each round: `ril progress "Review of <artifact>, round <n>: must-fix <N>, noted <M>."`.
 
 **Fix round.** Must-fix items go to a fresh agent, never a resumed one, with the artifact, the spec and `findings.md` in `inputs` and the artifact's paths in `touch`:
-- A spec, design or plan: a fresh `author`, told to fix the must-fix items only.
+- A spec, design or plan: a fresh `author`, told to fix the must-fix items only. When the spec is the artifact, the fix author gets the intake in the spec's place as well.
 - Built code or the running program: hand `findings.md` back to the owning skill (`ril-build` or `ril-verify`), which gives it to a fresh `fixer`.
 Then a fresh reviewer, with the same `inputs` as the first one: never the fix report. Noted items are not fixed; they stay in `findings.md`.
 
-**At the cap.** If must-fix items remain after the last allowed round (2 for light, 3 for full), stop fixing. For each one left: `ril decision log --stage <stage> --decision "Accepted risk for <id or artifact>: <the finding in plain words>" --why "still open after <n> review rounds"`. For built code, use the id of each scenario it affects, so a verifier can record `--review risks`. Then tell the person plainly: what is still wrong, what it could cause, and what happens next. Guided mode: ask before recording, with `ril gate park review-<unit> --question "<plain words>" --options "accept the risk|stop and change it" --default "accept the risk"`; on "stop and change it", hand back to the calling skill with the findings.
+**At the cap.** If must-fix items remain after the last allowed round (2 for light, 3 for full), stop fixing. For each one left (`--stage` is the current stage from `ril stage get`): `ril decision log --stage <stage> --decision "Accepted risk for <id or artifact>: <the finding in plain words>" --why "still open after <n> review rounds"`. For built code, use the id of each scenario it affects, so a verifier can record `--review risks`. Then tell the person plainly: what is still wrong, what it could cause, and what happens next. Guided mode (the mode is on the first line of `ril status --full`): ask before recording, with `ril gate park review-<unit> --question "<plain words>" --options "accept the risk|stop and change it" --default "accept the risk"`; on "stop and change it", hand back to the calling skill with the findings.
 
 **Hand back.** Tell the calling skill: clean, or accepted at the cap; and the path of the last reviewer's report, which a verifier needs for `--review`.
 
@@ -56,3 +56,4 @@ Then a fresh reviewer, with the same `inputs` as the first one: never the fix re
 - `ril decision log`: accepted risks at the cap.
 - `ril gate park`, `ril gate resolve`: the guided-mode question at the cap.
 - `ril progress`: one line per review round.
+- `ril stage get`, `ril status --full`: the stage for the decision, and the mode.

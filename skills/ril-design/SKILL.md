@@ -11,9 +11,9 @@ A design in which every part earns its place, a proof kit that says how every sc
 
 ## Rules
 
-**Who writes what.** Every document here is written by a fresh `author` spawned through `ril-control`, never by you. Its brief has the spec, the intake and the documents before it in `inputs`, its own document path in `touch`, and the acceptance below copied in. Each document is reviewed with `ril-review` (light review) before the next one starts; the plans are reviewed together, as one artifact. Autonomous mode: log each choice made for the person with `ril decision log --stage design --decision "<what>" --why "<why>"`.
+**Who writes what.** Every document here is written by a fresh `author` spawned through `ril-control`, never by you. Its brief has the spec, the intake and the documents before it in `inputs`, its own document path in `touch` (all as absolute `<project>/.ril/docs/...` paths), and the acceptance below copied in. Each document is reviewed with `ril-review` (light review) before the next one starts; the plans are reviewed together, as one artifact. Wherever this skill says guided or autonomous, the mode is on the first line of `ril status --full`. Autonomous mode: log each choice made for the person with `ril decision log --stage design --decision "<what>" --why "<why>"`.
 
-**1. The design**, `.ril/docs/design.md` (unit `design`). Acceptance:
+**1. The design**, `<project>/.ril/docs/design.md` (unit `design`). Acceptance:
 - The data first: what the program keeps, where, and in what shape.
 - Every component, layer, file and dependency is justified in one line: what it does and why nothing simpler would do (the simplicity budget). Nothing is added for later.
 - A short `## Security and non-functional` part: untrusted input, secrets, the files it reads and writes, and the speed and size needs from the spec, with a number where there is one.
@@ -22,24 +22,25 @@ A design in which every part earns its place, a proof kit that says how every sc
 - `## Checks`: the static checks for the stack (linter, type check, formatter), installed inside the project only, and one `verify` command kept in the project (for example `npm run verify`) that reruns every check and every test and prints how many it ran, so the proof can be rerun later by anyone.
 Guided mode: after its review, the person signs off the design.
 
-**2. The proof kit**, before any code. Run `ril-recipe` to create the proof kit and the feature map for every scenario. Then `ril scenario coverage` must exit 0; if it names a scenario, run `ril-recipe` for that scenario again.
+**2. The proof kit**, before any code. Run `ril-recipe` to create the proof kit and the feature map for every scenario. Then `ril scenario coverage` must exit 0; if it names a scenario, run `ril-recipe` for that scenario again, unless the scenario was set aside (below).
 
-**3. The plans**, `.ril/docs/plans/plan-<n>.md`, all written by one `author` (unit `design`). Acceptance:
+**3. The plans**, `<project>/.ril/docs/plans/plan-<n>.md`, all written by one `author` (unit `design`). Acceptance:
 - Plan 1 is a walking skeleton: the thinnest program that runs end to end, sets up the checks and the `verify` command, and proves exactly one scenario.
 - Each later plan is a vertical slice: something a person can run on its own once the plans before it are built, never a technical layer such as "the storage" or "the tests".
 - Each plan lists the scenarios it proves; every scenario is in at least one plan.
 - Each plan is small enough for one agent to hold the plan, the files it changes and their tests at once; a plan that is not is split.
 After the review, add each plan in order: `ril unit add plan-<n> --kind plan --title "<its title>"`. Guided mode: then the person signs off the plan list.
 
-**Guided-mode sign-offs** of the design and the plan list: `ril gate park signoff-<what> --question "<plain words, with where to read it>" --options "yes|change it" --default yes`, ask it, then `ril gate resolve signoff-<what> --answer "<their words>"`. On "change it", a fresh `author` makes the change, it is reviewed again, and you ask again.
+**Guided-mode sign-offs** of the design and the plan list: `ril gate park signoff-<what> --question "<plain words, with where to read it>" --options "yes|change it" --default yes`, ask it, then `ril gate resolve signoff-<what> --answer "<their words>"`. On "change it", a fresh `author` makes the change (the intake, the spec and that document as `inputs`), it is reviewed again at the light level, and you ask again. You never edit the documents yourself.
 
 **A criterion found unprovable** after the spec was approved (by the design, `ril-recipe` or a review): never quietly weaken it. Park it: `ril gate park unprovable-<id> --question "<what cannot be proven and why, in plain words>" --options "rewrite it|accept it unproven|drop it" --default "rewrite it"`, ask the person, record the answer with `ril gate resolve`, and act on it:
 - rewrite it: a fresh `author` rewrites it in the spec; then `ril scenario update <id> --criterion "<new words>"` and `ril-recipe` again for its feature map.
 - accept it unproven: `ril skip <id> --scenario --reason "<their words>"`, which records the decision `Accepted as unproven: <id>`; the final report lists it.
 - drop it: the same `ril skip`, with "dropped" in the reason, and a fresh `author` moves it to `## Later` in the spec.
+A set-aside scenario still counts for coverage: after `ril skip <id> --scenario`, a fresh `author` writes (or replaces) its feature map, `<project>/.ril/docs/verification/feature-map/<id>.md`, with the first line `Method: <its method>` and a first section saying the scenario was set aside and why, so `ril scenario coverage` passes. Never run `ril-recipe` again for a set-aside scenario.
 Carry on with the rest while you wait.
 
-**4. The brief.** A fresh `author` (unit `design`) writes `.ril/docs/brief.md` from `<plugin folder>/templates/project-brief.md` (the folder from `ril root`), with the intake, spec, design and every plan in `inputs`. Acceptance: at most 30 lines, plain words, no ids or commands, every scenario in plain words, every "my assumption" from the intake, every `## Later` and `## Needs a person` item, and a working relative link to each document. Then `ril progress "Brief ready."`, `ril stage set confirm`, and do the front door's confirm step: summarise the brief in plain words, say where to read it, and wait for go.
+**4. The brief.** A fresh `author` (unit `design`) writes `<project>/.ril/docs/brief.md` from `<plugin folder>/templates/project-brief.md` (the folder from `ril root`), with the intake, spec, design and every plan in `inputs`. Acceptance: at most 30 lines, plain words, no ids or commands, every scenario in plain words, every "my assumption" from the intake, every `## Later` and `## Needs a person` item, under "What I need from you" every accepted risk and every criterion accepted as unproven (from `ril decision list`), and a working relative link to each document. The brief itself is reviewed by `ril-review` at the light level, against the spec, before it is shown. Then `ril progress "Brief ready."`, `ril stage set confirm`, and do the front door's confirm step: summarise the brief in plain words, say where to read it, and wait for go.
 
 **Changes at confirm.** When the person asks for changes instead of go: a fresh `author` changes the affected documents (the spec, design or plans), you keep ril in step (`ril scenario update`, `ril scenario import` for a new scenario, `ril unit add` for a new plan), `ril-recipe` and `ril scenario coverage` again when a scenario changed, a light `ril-review` of what changed, a new brief, and ask again. The stage stays `confirm`.
 
@@ -71,5 +72,6 @@ Carry on with the rest while you wait.
 - `ril scenario coverage`: every scenario has its feature map.
 - `ril scenario update`, `ril scenario import`, `ril skip`: a changed, new or unprovable scenario.
 - `ril gate park`, `ril gate resolve`: sign-offs and unprovable criteria.
-- `ril decision log`: choices made for the person.
+- `ril decision log`, `ril decision list`: choices made for the person, and the accepted risks for the brief.
+- `ril status --full`: the mode, on its first line.
 - `ril progress`, `ril stage set`: record the step and move to confirm.
