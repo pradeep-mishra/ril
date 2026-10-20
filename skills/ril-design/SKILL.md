@@ -15,7 +15,7 @@ A design in which every part earns its place, a proof kit that says how every sc
 
 **1. The design**, `<project>/.ril/docs/design.md` (unit `design`). Acceptance:
 - The data first: what the program keeps, where, and in what shape.
-- Every component, layer, file and dependency is justified in one line: what it does and why nothing simpler would do (the simplicity budget). Nothing is added for later.
+- Every component, layer, file and dependency is justified in one line: what it does and why nothing simpler would do (the simplicity budget). Nothing is added for later. The default stack has no dependencies unless a need is justified; if the person said no to installing libraries (`.ril/docs/intake.md`), it has none at all, and its checks and generated-input tests use only what Node.js ships with.
 - A short `## Security and non-functional` part: untrusted input, secrets, the files it reads and writes, and the speed and size needs from the spec, with a number where there is one.
 - `## Where a bug would cost the most`: at most three promises where a bug would cost the most (lost data, wrong money, a security hole, corrupted state), each with its stronger check named now: a property-based or generated-input test that runs many inputs. If there is none, it says so.
 - `## Red flags`: the design is screened against each of these, and any found is fixed in the design, not only listed: a shallow module (big interface, little hidden); one decision leaked into several modules; two modules writing the same state; two ways to do one task; internals other code can import; a list kept by hand in two places.

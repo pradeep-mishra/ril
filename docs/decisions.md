@@ -10,21 +10,23 @@ a real run, and the failure is named in the Run log below.
 
 | Rule | Enforced by |
 |------|-------------|
-| Rail 1: a scenario becomes `proven` only through a result recorded by a registered `verifier` agent at the current saved version, with an existing, non-empty evidence file inside the project, at least 1 check and a clean review (or risks after "Accepted risk for <id>") | CLI rail: `ril ledger record`. Tests: `tests/rails.test.mjs`, `tests/rails-bypass.test.mjs`, `tests/lifecycle.test.mjs` |
-| While the proof kit's `verify.md` has no `Trusted: yes` line, only a `blocked` result is accepted | CLI rail: `ril ledger record`. Tests: `tests/rails.test.mjs`, `tests/lifecycle.test.mjs` |
+| Rail 1: a scenario becomes `proven` only through a result recorded by a registered `verifier` agent at the current saved version, with a non-empty evidence file under `.ril/evidence/` (anywhere else is refused), at least 1 check and a clean review (or risks after "Accepted risk for <id>") | CLI rail: `ril ledger record`. Tests: `tests/rails.test.mjs`, `tests/rails-bypass.test.mjs`, `tests/lifecycle.test.mjs` |
+| An untrusted kit, or no proof kit at all (`.ril/docs/verification/verify.md` missing), accepts only a `blocked` result. `Trusted: yes` counts only on the first line of `verify.md` | CLI rail: `ril ledger record`. Tests: `tests/rails.test.mjs`, `tests/review-fixes.test.mjs`, `tests/lifecycle.test.mjs` |
 | A pass moves to a later saved version only across test, doc or `.ril`-only changes | CLI rail: `ril ledger carry`. Tests: `tests/rails.test.mjs`, `tests/lifecycle.test.mjs` |
-| Rail 2: the project reaches `done` only when every scenario is proven at the current saved version, or set aside with "Accepted as unproven: <id>"; zero scenarios is refused | CLI rail: `ril stage set done`. Tests: `tests/rails.test.mjs`, `tests/lifecycle.test.mjs` |
+| Rail 2: the project reaches `done` only when every scenario is proven at the current saved version, or set aside with "Accepted as unproven: <id>", and at least one scenario is proven; zero scenarios is refused. When nothing can be proven, `ril-verify` parks the project (`ril stage set parked`) | CLI rail: `ril stage set done`. Tests: `tests/rails.test.mjs`, `tests/rails-bypass.test.mjs`, `tests/lifecycle.test.mjs` |
 | Rail 3: a scenario's criterion and method are frozen once past `confirm`, unless `--force "<reason>"` (which is logged) | CLI rail: `ril scenario update`. Test: `tests/commands-state.test.mjs` |
 | Rail 4: `ril round bump` past the cap (default 8) exits 4 and stores nothing | CLI rail: `ril round bump`. Tests: `tests/commands-state.test.mjs`, `tests/lifecycle.test.mjs` |
+| `round reset` needs `--force "<reason>"` and logs the reason as a decision | CLI rail: `ril round reset`. Test: `tests/commands-state.test.mjs` |
 | `--force` never bypasses Rail 2 (`done`) or Rail 4 (the cap) | CLI rail: `ril stage set`, `ril round bump`. Tests: `tests/rails.test.mjs`, `tests/commands-state.test.mjs` |
 | A bad agent brief is refused (exit 6) | CLI rail: `ril agent register`. Test: `tests/rails.test.mjs` |
 | Every refusal prints a `Next:` line saying what to do | CLI: all commands. Tests: the `fails` helper in `tests/helpers/repo.mjs`, used by most test files |
 | State is saved atomically, with a backup and a lock | Test: `tests/store.test.mjs`, `tests/lock.test.mjs` |
-| Recovery: damaged state, stale lock, dead agents, orphaned units, proofs with missing evidence or a changed product | CLI: `ril doctor --fix`. Tests: `tests/recovery.test.mjs`, `tests/lifecycle.test.mjs` |
+| Recovery: damaged state, stale lock, dead agents, orphaned units. Doctor demotes a proof only for missing or empty evidence or a lost saved version; a later change no longer demotes (accept mode re-verifies every scenario) | CLI: `ril doctor --fix`. Tests: `tests/recovery.test.mjs`, `tests/lifecycle.test.mjs` |
+| The allowlist deny entries (`Edit(.ril/state.json)`, its backups and the lock files) stop only the Edit tool from writing the state files, so they prevent accidents. A worker running `node` or `git` can still write them | Host-enforced, unmeasured: an owner re-check in `tests/e2e/RUNBOOK.md`. The entries themselves: `tests/preflight.test.mjs` |
 | A stuck item is set aside with a reason and the rest carries on | CLI: `ril skip`. Test: `tests/recovery.test.mjs` |
 | A finished real run ends in a state that meets every acceptance condition | Test of the checker: `tests/e2e/check-state.test.mjs`. The real run itself is manual (`tests/e2e/RUNBOOK.md`) |
 | Protected acceptance tests: implementers and fixers never edit them, only a tester does | Skill instruction only (`ril-build`, `ril-recipe`) |
-| The seal: one global seal over the protected files; the last `Sealed` decision in `ril decision list` wins and is compared after each implementer or fixer | Skill instruction and controller bookkeeping with git (`ril-build`, `ril-verify`). No CLI rail |
+| The seal: after each tester the controller saves a version T and logs "Sealed at <T> for <task unit>"; after every implementer or fixer it checks the last one with `git diff --quiet` on `tests/acceptance` and the verify script, and compares the six script values in `package.json`; a difference goes to a fresh tester | Skill instruction and controller bookkeeping with git (`ril-build`, `ril-verify`). No CLI rail |
 | Workers never change state; only the verifier records a result | Skill instruction only (standing rules). The allowlist entry `Bash(ril *)` lets any agent run any `ril` command |
 | The verifier is independent of the builders | Rail 1 needs a registered agent whose role is `verifier`, but anyone can register one. Skill instruction only |
 | `ril-control` rules: only fresh workers with a full brief; never spawn an unregistered agent; never review a diff yourself; refuse roles outside the six | Skill instruction only (`ril-control`). The CLI refuses an unknown role at `ril agent register` |
@@ -46,8 +48,9 @@ a real run, and the failure is named in the Run log below.
 These rules are only an instruction to an agent, or nothing yet. A model that ignores them is not stopped by RIL.
 
 - Protected acceptance tests and the seal: nothing in the CLI looks at them.
-- Workers changing state: any agent can run any `ril` command.
+- Workers changing state: `Bash(ril *)` still lets any agent run any `ril` command, including registering a fake verifier.
 - Verifier independence: anyone can register an agent with the role `verifier`.
+- The allowlist grants `Edit(./**)` and `Bash(node *)` (and `Bash(git *)`, `Bash(npm install *)`), which let workers run and change the project they build. The deny entries stop only the Edit tool from writing the state files; a worker running `node` or `git` can still write them. State integrity against a determined agent is not protected: there is no signing and no state kept outside the project.
 - Evidence is not hashed, so a file can be changed after it was recorded.
 - Acceptances never expire.
 - The `ril-control` rules, the rules read, retry, light and full review, plain language to the person, and risky actions never done silently.

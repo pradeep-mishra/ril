@@ -5,7 +5,7 @@ Step 3 is automated. This runbook is how milestone 1 is accepted.
 
 ## 1. Run RIL on the todo list idea (manual)
 
-1. Make an empty folder and go into it. Do not run `git init`; `ril checkpoint` creates the repository. Git must already know your name and email.
+1. Make an empty folder and go into it. Do not run `git init`; `ril checkpoint` creates the repository. Git must know your name and email, globally or set for this project by the guide RIL shows.
 2. Start Claude Code with the plugin: `claude --plugin-dir <path to this repo>`.
 3. Type `/ril`.
 4. Paste the text in `tests/e2e/todo-cli.idea.md`.
@@ -19,7 +19,7 @@ Step 3 is automated. This runbook is how milestone 1 is accepted.
 2. Stop the session: close the terminal window. Do not wait for it to finish.
 3. Open a new terminal in the same folder and start `claude --plugin-dir <path to this repo>` again.
 4. Type `/ril`. It should say what happened and carry on from where it was.
-5. Run the same `ledger summary` command again and compare. A scenario that was `proven` before must still be `proven`, and its saved result must be unchanged, so it was not redone.
+5. Run the same `ledger summary` command again and compare. Proofs recorded before the kill stay `proven` afterwards, and their saved results are unchanged, so they were not redone (files changed later no longer undo a proof; only missing evidence or a lost saved version does).
 6. Let the run finish.
 
 ## 3. Check the result (automated)
@@ -45,6 +45,8 @@ Mark each one in the run log once you have seen it work.
 
 - Typing `/ril` in an interactive session. The spike only measured it with `claude -p`.
 - Whether allowlist entries written into the project settings in the middle of a session take effect without a restart.
-- Whether the allowlist entry `Edit(.ril/**)` still matches when Claude Code is started from a subfolder.
+- Workers edit product files without a prompt (the `Edit(./**)` allow rule), also when Claude Code was started from a subfolder of the project.
+- The deny rules really block a worker from editing `.ril/state.json`: try asking a worker to edit .ril/state.json with the Edit tool and confirm it is refused; note that a `node` command could still write it (the deny rules stop accidents, not a determined agent).
+- The git identity guide works on a machine without a global git identity: the project-local `git config user.name` and `git config user.email` lines let `ril checkpoint` save.
 - The Windows launcher `bin/ril.cmd`.
 - A first real install of the plugin, and whether a bare `ril` works from the shell afterwards.

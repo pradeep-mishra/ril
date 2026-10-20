@@ -15,7 +15,7 @@ const PARTS = ['Outcome', 'Rules', 'Done when', 'Involve the person when', 'Ask 
 const TOOLS = ['Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash'];
 const OWNER = { author: 'ril-shape', tester: 'ril-build', implementer: 'ril-build', reviewer: 'ril-review', verifier: 'ril-verify', fixer: 'ril-verify' };
 const DIRECTION = ['principles.md', 'templates/standing-rules.md', 'templates/agent-brief.md', 'templates/agent-report.md', 'templates/spec.md', 'templates/project-brief.md',
-  'templates/feature-map.md', 'templates/stop-report.md', 'templates/verify.md'];
+  'templates/feature-map.md', 'templates/stop-report.md', 'templates/verify.md', 'templates/final-report.md'];
 
 const skills = () => skillNames().map((name) => ({ name, ...readSkill(name) }));
 const roles = () => roleNames().map((name) => ({ name, ...readRole(name) }));
@@ -122,13 +122,14 @@ test('ril-control refuses roles outside the six', () => {
   assert.deepEqual(line[1].split(/,\s*|\s+and\s+|,?\s+or\s+/).map((s) => s.trim()).sort(), [...ROLES].sort());
 });
 
-test('ril-control keeps the retry, parallel and always-a-result rules', () => {
+test('ril-control keeps the retry, one-at-a-time and always-a-result rules', () => {
   const { body } = readSkill('ril-control');
   assert.match(body, /You are the only agent that changes project state\./);
   assert.match(body, /Retry by how it failed: a cap hit or out-of-memory gets a smaller scope/);
   assert.match(body, /after two retries park the unit and replan around it/);
-  assert.match(body, /Tasks run in parallel only when their `touch` sets are disjoint/);
-  assert.match(body, /Tasks run in parallel only when their `touch` sets are disjoint, otherwise one at a time\./);
+  assert.match(body, /Run workers one at a time in this version/);
+  assert.doesNotMatch(body, /in parallel|disjoint/, 'no parallel-workers rule');
+  assert.ok(!body.includes('adapter notes'), 'the ril value is `ril`, not an adapter note');
   assert.ok(!body.includes('worktree'), 'ril-control names no worktrees');
   assert.match(body, /--state done --result "/);
   assert.match(body, /--state failed --result "/);
@@ -441,7 +442,7 @@ test('stop report template: the five parts and the four options', () => {
 
 test('ril-build: tasks file, a pilot first, tester then implementer, honest tests, protected paths, full review', () => {
   const { body, file } = readSkill('ril-build');
-  has(body, ['<project>/.ril/docs/plans/plan-<n>-tasks.md', 'pilot', 'fresh', 'disjoint', '`Protected:`', '`ril-control`',
+  has(body, ['<project>/.ril/docs/plans/plan-<n>-tasks.md', 'pilot', 'fresh', 'one at a time', '`Protected:`', '`ril-control`',
     'an expected value computed by the code under test', 'an assertion on data the test built itself',
     'an assertion looser than the contract', 'no positive case', 'fail when the behavior breaks', 'only internals change',
     'plan-<n>-t<k>', '`ril unit set', '`ril checkpoint`', 'FULL'], file);
@@ -496,28 +497,27 @@ test('protected set: acceptance tests and the verify entries only; kit documents
   for (const name of ['ril-build', 'ril-verify']) has(readSkill(name).body, ['tests/regression/'], name);
 });
 
-test('the seal: recorded after each tester, compared after every implementer or fixer, mismatches go to a tester', () => {
+test('the seal: a checkpoint after each tester, compared after every implementer or fixer, mismatches go to a tester', () => {
   const scripts = ['verify', 'test', 'preverify', 'postverify', 'pretest', 'posttest'];
   for (const name of ['ril-build', 'ril-verify']) {
     const { body } = readSkill(name);
-    has(body, ['Sealed', '`git rev-parse', 'tests/acceptance', 'after every implementer or fixer', 'fresh `tester`'], name);
+    has(body, ['Sealed at', 'tests/acceptance', 'after every implementer or fixer', 'fresh `tester`', '`git diff --quiet <T>'], name);
     for (const k of scripts) assert.match(body, new RegExp(`\\b${k}\\b`), `${name} lacks script ${k}`);
-    for (const gone of ['Tester version', 'plan start', 'newest', 'resets the baseline', 'restoring']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
-    assert.match(body, /(?:seal mismatch|`Protected:` must-fix)[^\n]*fresh `tester`[^\n]*never a fixer or the implementer/, name);
+    for (const gone of ['Tester version', 'plan start', 'newest', 'resets the baseline', 'restoring', 'tree hash', 'git rev-parse', 'parallel']) {
+      assert.ok(!body.includes(gone), `${name} still says ${gone}`);
+    }
+    assert.match(body, /(?:seal mismatch|`Protected:` must-fix|difference)[^\n]*fresh `tester`[^\n]*never a fixer or the implementer/, name);
+    assert.match(body, /last `Sealed` decision/, name);
   }
   const build = readSkill('ril-build').body;
-  assert.match(build, /`ril decision log --stage build --decision "Sealed <task unit\(s\)>: tests <tree hash>; scripts <values>" --why "tester finished"`/);
-  assert.match(build, /after the last of several parallel testers finishes[^\n]*one `ril checkpoint`/);
-  assert.match(build, /`git rev-parse T:tests\/acceptance`/);
-  assert.match(build, /`git show T:package\.json`/);
-  for (const [name, body] of [['ril-build', build], ['ril-verify', readSkill('ril-verify').body]]) {
-    has(body, ['the latest `Sealed` decision in `ril decision list` (the last one listed, whichever task it names)'], name);
-    for (const gone of ['latest seal of that task unit', 'owns it', "plan's latest seal", 'tester versions']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
-  }
-  assert.ok(!build.includes('--checkpoint <id>`'), 'no tester checkpoint stored on the task unit');
+  assert.match(build, /`ril decision log --stage build --decision "Sealed at <T> for <task unit>" --why "tester finished"`/);
+  assert.match(build, /`git diff --quiet <T> HEAD -- tests\/acceptance`/);
+  assert.match(build, /`git show <T>:package\.json`/);
+  assert.match(build, /new `Sealed at <T2>` decision/);
+  assert.doesNotMatch(build, /plan-<n>-t<k> --state \w+ --checkpoint/, 'no tester checkpoint stored on the task unit');
   const verify = readSkill('ril-verify').body;
   assert.match(verify, /changed since the seal[^\n]*records `blocked`[^\n]*seal check/);
-  assert.match(verify, /per-fixer checkpoints first[^\n]*batch checkpoint after them/);
+  assert.doesNotMatch(verify, /per-fixer checkpoints|batch checkpoint/, 'no per-fixer and batch checkpoint contradiction');
   assert.doesNotMatch(verify, /git log/, 'the verifier runs no protected diff check');
   assert.doesNotMatch(verify.slice(at(verify, 'Then the verifiers'), at(verify, '**Collect.')), /\bsends?\b/, 'the verifier sends nothing');
 });
@@ -528,9 +528,9 @@ test('ril-verify: review per scenario, untrusted kit, one batch per round, no co
   assert.match(body, /`risks` when `Accepted risk for <this scenario's id>`/);
   assert.match(body, /otherwise `none`[^\n]*refuse/);
   assert.match(body, /Until then only `blocked` can be recorded/);
-  assert.match(body, /one batch per round/i);
-  assert.match(body, /collect them all, take one `ril checkpoint`/);
-  assert.match(body, /a second `ril checkpoint`[^\n]*invalidates/);
+  assert.match(body, /one at a time/i);
+  assert.match(body, /after each fixer's seal check, one `ril checkpoint`/);
+  assert.match(body, /at the latest saved version/);
   for (const gone of ['two fixers', 'worktree', 'competing fixers']) assert.ok(!body.includes(gone), `ril-verify still says ${gone}`);
   assert.match(body, /two failures with the same cause[^\n]*writes down its assumption and tests it/i);
   assert.match(body, /competing attempts are not used in this version/);
@@ -575,10 +575,12 @@ test('author role covers every document authors write, from its goal and touch',
 });
 
 
-test('drift regression: fixed and verified within its own plan, then back to the new plan', () => {
+test('drift regression: fixed and verified within its own plan, then back to the new plan, said in one place', () => {
   const rule = /regressed scenario's own plan[^\n]*its tasks[^\n]*verifiers run only for the regressed scenarios[^\n]*back to `ril-build` for the new plan, not the regressed one/;
   assert.match(readSkill('ril-verify').body, rule);
-  assert.match(readSkill('ril-recipe').body, rule);
+  const recipe = readSkill('ril-recipe').body;
+  assert.doesNotMatch(recipe, rule, 'the rule lives in ril-verify only');
+  assert.match(recipe, /`ril-verify` says how a regressed scenario is fixed and proven again/);
 });
 
 test('protected set also covers the lifecycle scripts; T1 tester writes the .gitignore; implementer sees verify.md', () => {
@@ -602,9 +604,130 @@ test('ril-recipe: the author acceptance list is whole; kit documents rule is its
   const who = body.slice(body.indexOf('**Who writes the kit.**'), body.indexOf('**Kit documents**'));
   has(who, ['`## Self-run`', 'labelled measured, inferred or guess'], 'author acceptance');
   assert.match(body, /\n\n\*\*Kit documents\*\*/);
-  assert.match(body, /regression in an earlier plan's scenario[^\n]*back to `ril-build` for the new plan/);
 });
 
 test('ril-verify: fix-loop verifiers also cover a regressed earlier scenario', () => {
   assert.match(readSkill('ril-verify').body, /one fresh verifier per scenario of the plan, at that saved version/);
+});
+
+test('front door: collects finished agents and lists leftover edits right after doctor', () => {
+  const { body, lines } = readSkill('ril');
+  assert.ok(lines <= 120, `${lines} lines`);
+  assert.deepEqual(headings(body), PARTS);
+  const doctor = at(body, 'Otherwise run `ril doctor --fix --quiet`');
+  const collect = at(body, '**Collect finished agents.**');
+  assert.ok(collect > doctor && collect < at(body, '**Questions first.**'), 'collect after doctor, before anything else');
+  const rule = body.slice(collect, body.indexOf('\n\n', collect));
+  has(rule, ['`ril-control`', '`running`', 'report', '`done` with no result', '`git status --porcelain`', 'fresh worker', 'never edits product files'], 'collect rule');
+});
+
+test('front door: a resolved answer goes back to the skill that asked, by its gate prefix', () => {
+  const { body } = readSkill('ril');
+  const parked = new Set();
+  for (const name of skillNames()) {
+    for (const m of readSkill(name).body.matchAll(/`ril gate park ([a-z]+-)</g)) parked.add(m[1]);
+  }
+  assert.ok(parked.size >= 4, [...parked].join(' '));
+  const table = body.slice(at(body, '| Question id starts with |'));
+  for (const prefix of parked) assert.match(table, new RegExp(`\\| \`${prefix}\` \\| [^\\n]*\`ril-`), `no hand-back row for ${prefix}`);
+  const rows = [...table.matchAll(/^\| `([a-z]+-)` \|/gm)].map((m) => m[1]);
+  for (const r of rows) assert.ok(parked.has(r), `row ${r} is not a prefix any skill parks`);
+});
+
+test('front door: catch-up lists only choices made for the person and sums up recovery', () => {
+  const { body } = readSkill('ril');
+  for (const lead of ['`ril doctor:`', '`Sealed`', '`Carried`', '`Moved the project`', '`Changed the`']) assert.ok(body.includes(lead), lead);
+  assert.match(body, /After the stop I repaired N things/);
+  assert.match(body, /never show ids, hashes or commands/i);
+  assert.ok(!body.includes('do not trust the last pass'), 'earlier proofs stay proven');
+  assert.match(body, /`## Doctor`[^\n]*verify\.md/);
+  assert.match(body, /earlier proofs stay proven[^\n]*re-verified at accept/i);
+});
+
+test('ril-build resumes safely and runs workers one at a time', () => {
+  const { body } = readSkill('ril-build');
+  assert.match(body, /only when plan-<n> is `todo`/);
+  assert.match(body, /skip any step whose output already exists/);
+  assert.match(body, /never rebuild a task whose unit is `built` or later/i);
+  assert.match(body, /one at a time in this version/);
+  for (const gone of ['disjoint', 'parallel', 'worktree']) assert.ok(!body.includes(gone), `ril-build still says ${gone}`);
+});
+
+test('ril-verify: nothing proven parks, round reset needs a reason, review rounds are not fix rounds', () => {
+  const { body } = readSkill('ril-verify');
+  const accept = body.slice(at(body, '**Accept mode'));
+  assert.match(accept, /when every plan is verified or parked/);
+  assert.match(accept, /at least one scenario is proven/);
+  assert.match(accept, /nothing could be proven[^\n]*stop report[^\n]*`ril stage set parked`[^\n]*never `done`/i);
+  assert.match(body, /`ril round reset <id> --force "<the person's hint or approval>"`/);
+  assert.doesNotMatch(body, /`ril round reset <id>`/, 'every reset carries --force');
+  assert.match(body, /must-fix loop is counted by `ril-review`'s own round cap[^\n]*never `ril round bump`/);
+  assert.match(body, /`ril round bump` counts only a verifier's `failed` verdict/);
+  assert.match(body, /`Trusted: yes \(<V>\)` on the first line of `verify\.md`/);
+  assert.match(body, /\.ril\/evidence\/<scenario>\/<V>\/<file>/);
+  assert.match(accept, /templates\/final-report\.md/);
+  assert.doesNotMatch(body, /in parallel/, 'verifiers and fixers run one at a time');
+});
+
+test('ril-recipe and verify.md: the Self-run sets the same first line', () => {
+  const lines = readFile('templates/verify.md').text.split('\n');
+  assert.equal(lines[0], 'Trusted: no');
+  assert.match(readFile('templates/verify.md').text, /set that first line to `Trusted: yes \(<saved version>\)`/);
+  assert.match(readSkill('ril-recipe').body, /`Trusted: no` as its first line[^\n]*Self-run[^\n]*sets that same line to `Trusted: yes \(<saved version>\)`/s);
+});
+
+test('final report template: the five plain headings, at most 30 lines', () => {
+  const f = readFile('templates/final-report.md');
+  assert.ok(f.lines <= 30, `${f.lines} lines`);
+  assert.deepEqual(headings(f.text), ['What was built', 'What works', 'What is not covered', 'Decisions made for you', 'How to run it']);
+  const notCovered = f.text.slice(f.text.indexOf('## What is not covered'), f.text.indexOf('## Decisions made for you'));
+  has(notCovered, ['verified', 'assumptions', 'left out', 'accepted without proof'], 'What is not covered');
+  assert.ok(rilCommandsIn(f.text).length === 0, 'no commands for the person');
+});
+
+test('ril-shape asks plainly before installing libraries; no means no dependencies', () => {
+  const shape = readSkill('ril-shape').body;
+  assert.match(shape, /install the libraries the project needs \(this lets the workers run `npm install` and `npm ci`, which can download and run other people's code\)/);
+  assert.match(shape, /If the person says no[^\n]*no dependencies[^\n]*not to install anything/);
+  assert.match(readSkill('ril-design').body, /default stack has no dependencies unless a need is justified/);
+});
+
+// The goal is to shrink this budget over time, never to raise it.
+const WORD_BUDGET = 2000;
+const words = (text) => text.split(/\s+/).filter(Boolean).length;
+
+test(`no skill is over ${WORD_BUDGET} words`, () => {
+  for (const name of skillNames()) {
+    const n = words(readSkill(name).text);
+    assert.ok(n <= WORD_BUDGET, `${name} has ${n} words`);
+  }
+});
+
+test('README: plain, the seven parts, real install lines, no other plugin', () => {
+  const f = readFile('README.md');
+  assert.ok(f.lines <= 70, `${f.lines} lines`);
+  assert.deepEqual(headings(f.text), ['What it does', 'What you need', 'Install', 'Start', 'What it creates', 'Resume', 'Limits']);
+  has(f.text, ['Node.js 20.10 or newer', 'git', 'claude --plugin-dir', '/plugin marketplace add', '/plugin install ril@ril', 'no remote', '/ril',
+    'trust', '`.ril/`', '`.claude/settings.json`', '`CLAUDE.md`', '`AGENTS.md`', 'command-line programs only', 'Windows', 'deployed'], f.file);
+  assert.doesNotMatch(f.text, /https?:\/\//, 'no invented URL');
+});
+
+test('docs and the runbook name no other plugin; the runbook has the owner re-checks', () => {
+  for (const rel of ['README.md', 'docs/decisions.md', 'tests/e2e/RUNBOOK.md', 'templates/final-report.md']) {
+    const { text } = readFile(rel);
+    for (const name of FORBIDDEN) assert.ok(!text.toLowerCase().includes(name), `${rel} names another plugin`);
+  }
+  const run = readFile('tests/e2e/RUNBOOK.md');
+  assert.ok(run.lines <= 80, `${run.lines} lines`);
+  has(run.text, ['`Edit(./**)`', 'subfolder', '`.ril/state.json`', 'refused', 'a `node` command could still write it', 'global git identity',
+    'stay `proven`'], run.file);
+});
+
+test('decisions.md: at most 90 lines, with every updated row and limit', () => {
+  const f = readFile('docs/decisions.md');
+  assert.ok(f.lines <= 90, `${f.lines} lines`);
+  has(f.text, ['no proof kit', 'first line', 'under `.ril/evidence/`', '`round reset`', 'at least one scenario is proven',
+    'a later change no longer demotes', 'deny', 'only the Edit tool', '`Bash(node *)`', 'Sealed at', '`git diff --quiet`',
+    'registering a fake verifier', '`Edit(./**)`', 'no signing'], f.file);
+  assert.doesNotMatch(f.text, /changed product/, 'doctor no longer demotes for a changed product');
 });

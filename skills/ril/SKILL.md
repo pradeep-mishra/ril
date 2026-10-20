@@ -20,9 +20,20 @@ The person's idea becomes software that runs on their machine, with every promis
 - The file exists but will not start (macOS or Linux): "Run `chmod +x "${CLAUDE_PLUGIN_ROOT}/bin/ril"`, then type /ril again."
 Do nothing else until it runs.
 
-**After a stop.** After a stop (`--new-session`), run the kit's Doctor check from `verify.md` (`.ril/docs/verification/verify.md`, once it exists) before continuing and do not trust the last pass until a verifier reruns it.
+**Collect finished agents.** Right after doctor, before anything else, collect through `ril-control` every agent in `ril agent list` that is `running` while its `report.md` is on disk, or `done` with no result. Then list the stopped workers' leftover unsaved edits with `git status --porcelain`: keep them when a collected report covers that work (the owning skill's next checkpoint saves them), otherwise have a fresh worker redo that work through `ril-control`. The controller never edits product files itself.
 
-**Questions first.** If a question is waiting (`ril gate list --status open`), ask it first: one question, with the default. Record the answer with `ril gate resolve`.
+**After a stop** (`--new-session`), once `.ril/docs/verification/verify.md` exists, run its `## Doctor` health check from verify.md before continuing. Earlier proofs stay proven; they are re-verified at accept.
+
+**Questions first.** If a question is waiting (`ril gate list --status open`), ask it first: one question, with the default. Record the answer with `ril gate resolve`, then hand the answer back to the skill that asked, by the start of the question id:
+
+| Question id starts with | The skill that continues |
+|-------------------------|--------------------------|
+| `needs-` | `ril-shape` |
+| `signoff-` | `ril-shape` in the shape stage, `ril-design` in the design stage |
+| `unprovable-` | `ril-design` (`ril-recipe` acts on it the same way) |
+| `review-` | `ril-review`, which hands back to the skill that called it |
+| `stuck-` | `ril-verify` |
+| anything else (a worker's name) | `ril-control`, for that blocked worker |
 
 **Then act on `ril stage get`:**
 
@@ -45,7 +56,7 @@ Do nothing else until it runs.
 **Coming back after a gap** (a new session, or the person returns after work ran without them), open in this order:
 1. One sentence saying what is waiting on them, or that nothing is.
 2. What changed since they last looked, in plain words (from `.ril/log.md` and `ril status`).
-3. "Decisions I made for you": each decision from `ril decision list` newer than the last "Caught the person up." line in `.ril/log.md` (all of them if there is none), and what they could have said instead.
+3. "Decisions I made for you": each decision from `ril decision list` newer than the last "Caught the person up." line in `.ril/log.md` (all of them if there is none), and what they could have said instead. List only choices made for the person: skip decisions whose text begins `ril doctor:`, `Sealed`, `Carried`, `Moved the project` or `Changed the`. Sum recovery up in one plain line, "After the stop I repaired N things" (N: the `ril doctor:` decisions and a restored state among them); never show ids, hashes or commands.
 4. Every item waiting on them, each decidable from the message alone, with your pick.
 Never invent a decision; list only what `ril decision list` holds. After telling them, run `ril progress "Caught the person up."`.
 
@@ -75,5 +86,6 @@ The project is checked, the person knows where it stands and what happens next, 
 - `ril stage get`, `ril stage set`: where the project is, and the go after confirm.
 - `ril status --full`: the full picture for a status request.
 - `ril gate list`, `ril gate resolve`: questions waiting on the person.
+- `ril agent list`: finished agents to collect after a stop.
 - `ril decision list`: decisions made for the person, for the catch-up.
 - `ril skip`: set something aside with the person's reason.

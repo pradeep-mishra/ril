@@ -12,7 +12,7 @@ Protected: tests/acceptance/, <the verify command's script file, for example scr
 - The verify command: `<for example npm run verify>`. It reruns every check and every test, including `tests/acceptance/` and `tests/regression/`, and prints how many checks it ran; zero, or fewer than last time while the feature map did not shrink, is a failure.
 
 ## Evidence
-- One transcript per scenario and saved version: `.ril/evidence/<id>/<saved version>/transcript.txt`, each entry `$ command`, then `stdout:`, `stderr:` and `exit code:` exactly as they were.
+- One transcript per scenario and saved version: `.ril/evidence/<id>/<saved version>/transcript.txt` (evidence counts only as a non-empty file under `.ril/evidence/`), each entry `$ command`, then `stdout:`, `stderr:` and `exit code:` exactly as they were.
 - <Any other evidence this project needs, such as a file the program wrote, read back afterwards.>
 
 ## Cleanup
@@ -20,7 +20,7 @@ Protected: tests/acceptance/, <the verify command's script file, for example scr
 - Check that the project has no new files except the evidence (`git status`).
 
 ## Doctor
-Run after a stop, before trusting any earlier proof:
+Run after a stop, as a health check before work carries on (earlier proofs stay proven):
 1. <The build or install command>: it finishes without errors.
 2. The verify command: it runs and prints a checks count above zero.
 
@@ -30,4 +30,4 @@ Run once, by a verifier, on the first real build:
 2. Copy the project into a temporary folder and make one deliberate break there (a scratch change, never in the project) that breaks what one check covers.
 3. Run that check in the copy: it must fail. A check never seen failing is not trusted.
 4. Then undo the break and run it again: it passes. Then cleanup, and confirm the evidence survived it.
-5. Only then set the first line to `Trusted: yes (<saved version>)`, and say so in the report so the controller logs a decision.
+5. Only then set that first line to `Trusted: yes (<saved version>)` (only the first line counts), and say so in the report so the controller logs a decision.
