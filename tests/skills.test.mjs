@@ -485,7 +485,7 @@ test('ril-verify accept mode: fresh verifier, traceability, scans, guide, final 
   has(accept, ['`git grep', 'audit'], file);
 });
 
-const PROTECTED_CHECK = /newest `Tester version` checkpoint stored on a task unit[^\n]*`git diff --name-only <newest tester version> <[^>]+> -- <Protected paths>` is empty/;
+const PROTECTED_CHECK = /Every saved version since the plan's start that changed a `Protected:` path must be a `Tester version`: run `git log --format='%h %s' <plan start>\.\.<[^>]+> -- <Protected paths>`[^\n]*every subject must start `Tester version`, except a version that a later `Tester version restoring <id>` message names as restored/;
 
 test('protected set: acceptance tests and the verify entries only; kit documents follow touch', () => {
   for (const name of LAST_SKILLS) assert.doesNotMatch(readSkill(name).body, /`Protected:`[^\n]{0,80}\.ril\/docs\/verification/, name);
@@ -560,15 +560,22 @@ test('author role covers every document authors write, from its goal and touch',
   assert.match(r.body, /`goal`[^\n]*`touch`/);
 });
 
-test('protected check: bounded by the newest tester version, restored only by a tester', () => {
+test('protected check: a window from the plan start, restored only by a tester that names the violation', () => {
   const build = readSkill('ril-build').body;
   const verify = readSkill('ril-verify').body;
   for (const [name, body] of [['ril-build', build], ['ril-verify', verify]]) {
-    assert.match(body, /a later tester version resets the baseline/, name);
-    assert.match(body, /`Protected:` (?:must-fix|violation)[^\n]*fresh `tester`[^\n]*never a fixer[^\n]*new `Tester version` checkpoint[^\n]*task unit/, name);
+    assert.match(body, PROTECTED_CHECK, name);
+    assert.match(body, /`Protected:` (?:must-fix|violation)[^\n]*fresh `tester`[^\n]*never a fixer/, name);
+    assert.match(body, /`ril checkpoint --message "Tester version restoring <violating version id> for <task unit>"`/, name);
+    for (const gone of ['newest tester version', 'resets the baseline', 'git diff --name-only <newest']) assert.ok(!body.includes(gone), `${name} still says ${gone}`);
   }
-  assert.doesNotMatch(build + verify, /`git log [^`]*<Protected paths>`/, 'no unbounded history check');
-  assert.match(build, /`ril unit list --kind task --json`/);
+  assert.match(build, /`ril unit set plan-<n> --state doing --checkpoint <the id it printed>`/, 'the plan start is stored on the plan unit');
+});
+
+test('drift regression: fixed and verified within its own plan, then back to the new plan', () => {
+  const rule = /regressed scenario's own plan[^\n]*(?:plan start|its start)[^\n]*task units[^\n]*verifiers run only for the regressed scenarios[^\n]*back to `ril-build` for plan/;
+  assert.match(readSkill('ril-verify').body, rule);
+  assert.match(readSkill('ril-recipe').body, rule);
 });
 
 test('protected set also covers the lifecycle scripts; T1 tester writes the .gitignore; implementer sees verify.md', () => {
@@ -579,6 +586,8 @@ test('protected set also covers the lifecycle scripts; T1 tester writes the .git
   }
   const build = readSkill('ril-build').body;
   assert.match(build, /tester[^\n]*`touch`[^\n]*for T1 also `package\.json` and the project `\.gitignore`/);
+  assert.match(build, /the implementer never writes `\.gitignore`/);
+  assert.doesNotMatch(build, /`Files:` include the `\.gitignore`/);
   assert.match(build, /implementer[^\n]*`inputs`[^\n]*`<project>\/\.ril\/docs\/verification\/verify\.md`/);
   const outcome = build.slice(0, build.indexOf('## Rules'));
   assert.ok(!outcome.includes('proof kit'), 'the outcome names the protected entries, not the proof kit');
@@ -594,5 +603,5 @@ test('ril-recipe: the author acceptance list is whole; kit documents rule is its
 });
 
 test('ril-verify: fix-loop verifiers also cover a regressed earlier scenario', () => {
-  assert.match(readSkill('ril-verify').body, /one fresh verifier per scenario of the plan and per regressed scenario from the drift check/);
+  assert.match(readSkill('ril-verify').body, /one fresh verifier per scenario of the plan, at that saved version/);
 });
