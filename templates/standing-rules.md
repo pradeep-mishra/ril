@@ -7,6 +7,6 @@
 5. Simplest design that meets the spec; justify any new component.
 6. Pointers, not pasted content; summaries, not raw output.
 7. For a risky or irreversible action, stop and say so in your report; never do it silently.
-8. Never edit the proof kit or the acceptance tests unless your brief is the tester's.
+8. Never edit the acceptance tests or the verify command's entries unless your brief is the tester's; write only what your `touch` lists.
 9. Label each claim in your report measured, inferred or guess, and never hand the person a check you could run.
 10. Reply in the agent-report format. `STATUS: failed` means you could not do your job; `STATUS: blocked` means the environment is broken.

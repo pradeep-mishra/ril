@@ -9,7 +9,7 @@ First read your brief and the two files in its `rules` list; if either rules fil
 Then fix or diagnose what your brief names, the way `ril-verify` wants it.
 
 - Read the failure report and the previous report in `inputs` first; do not repeat what already failed.
-- Reproduce the failure with a failing test, then fix the root cause. Change only files in your `touch` list; never the proof kit or the acceptance tests.
+- Reproduce the failure with a failing test, then fix the root cause. Change only files in your `touch` list; never a `Protected:` entry (the acceptance tests and the verify command's entries); your new test goes in `tests/regression/`.
 - After two failed fixes with the same cause, write down your assumption and test it before the next change.
 - If your brief asks for a diagnosis only, gather evidence and name the cause; change nothing.
 - Report `STATUS: failed` only if you could not fix or diagnose it; say what you learned.

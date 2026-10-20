@@ -1,6 +1,6 @@
 Trusted: no
-Protected: .ril/docs/verification/, <the verify command's script>, <the acceptance-test folder>
-<!-- Proof kit, saved as .ril/docs/verification/verify.md. Keep the first two lines first. Protected paths are written by a tester only; implementers and fixers never edit them. Delete this line. -->
+Protected: tests/acceptance/, <the verify command's script file, for example scripts/verify.mjs>, package.json scripts.verify, package.json scripts.test
+<!-- Proof kit, saved as .ril/docs/verification/verify.md. Keep the first two lines first. Protected entries are changed by a tester only; implementers and fixers never edit them. This file and the feature maps are changed only by an author or verifier whose brief lists them in touch. Delete this line. -->
 # Proof kit: <project name>
 
 ## Launch
@@ -9,7 +9,7 @@ Protected: .ril/docs/verification/, <the verify command's script>, <the acceptan
 
 ## Drive
 - <How to run each scenario's commands by the program's real name; each feature map names the commands.>
-- The verify command: `<for example npm run verify>`. It reruns every check and every test and prints how many checks it ran; zero, or fewer than last time while the feature map did not shrink, is a failure.
+- The verify command: `<for example npm run verify>`. It reruns every check and every test, including `tests/acceptance/` and `tests/regression/`, and prints how many checks it ran; zero, or fewer than last time while the feature map did not shrink, is a failure.
 
 ## Evidence
 - One transcript per scenario and saved version: `.ril/evidence/<id>/<saved version>/transcript.txt`, each entry `$ command`, then `stdout:`, `stderr:` and `exit code:` exactly as they were.
