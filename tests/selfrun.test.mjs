@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
-import { addScenario, commitFile, evidence, fails, head, ok, record, register, withRepo } from './helpers/repo.mjs';
+import { addScenario, commitFile, evidence, fails, head, ok, record, register, trustKit, withRepo } from './helpers/repo.mjs';
 
 const say = (dir, line) => fs.writeFileSync(path.join(dir, '.ril', 'docs', 'verification', 'verify.md'), `${line}\n\n# Verify\n`);
 const selfrun = (dir, version, extra = {}) => {
@@ -23,7 +23,7 @@ test('a kit is trusted only with its line and a self-run row for the version on 
 
     ok(dir, ...selfrun(dir, first));
     const [row] = load(dir).selfruns;
-    assert.deepEqual({ ...row, ts: 0 }, { version: first, breakEvidence: '.ril/evidence/kit/broken.txt', restoredEvidence: '.ril/evidence/kit/restored.txt', verifier: 'V1', ts: 0 });
+    assert.deepEqual({ ...row, ts: 0, kit: 0 }, { kit: 0, version: first, breakEvidence: '.ril/evidence/kit/broken.txt', restoredEvidence: '.ril/evidence/kit/restored.txt', verifier: 'V1', ts: 0 });
     say(dir, 'Trusted: no');
     assert.match(record(dir, 'S1', first, 'proven-cli').stderr, /not trusted/, 'the row alone is not enough');
     say(dir, `Trusted: yes (${first.slice(0, 7)})`);
@@ -62,5 +62,23 @@ test('a self-run needs a verifier, the current version and two different real ev
     fs.writeFileSync(path.join(dir, '.ril', 'state.json'), JSON.stringify(old));
     ok(dir, ...selfrun(dir, now));
     assert.equal(load(dir).selfruns.length, 1, 'a state saved before self-runs existed still loads');
+  });
+});
+
+test('a self-run covers the kit content it saw: a changed body or feature map needs a new self-run, line 1 alone does not', () => {
+  withRepo((dir) => {
+    addScenario(dir);
+    trustKit(dir);
+    const kit = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
+    const proof = () => record(dir, 'S1', head(dir), 'proven-cli');
+    assert.equal(proof().code, 0);
+    fs.writeFileSync(kit, fs.readFileSync(kit, 'utf8').replace('Trusted: yes', 'Trusted:   yes'));
+    assert.equal(proof().code, 0, 'the first line is not part of what the self-run saw');
+    for (const [what, change] of [['the body', () => fs.appendFileSync(kit, 'a weaker check\n')], ['a feature map', () => fs.mkdirSync(path.join(kit, '..', 'feature-map')) || fs.writeFileSync(path.join(kit, '..', 'feature-map', 'S1.md'), 'Method: cli\n')]]) {
+      change();
+      assert.match(proof().stderr, /kit changed after its self-run/, what);
+      ok(dir, ...selfrun(dir, head(dir)));
+      assert.equal(proof().code, 0, `a new self-run restores trust after ${what} changed`);
+    }
   });
 });

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
-import { kitTrust } from '../lib/proof.mjs';
+import { kitHash, kitTrust } from '../lib/proof.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpProject } from './helpers/tmp.mjs';
@@ -22,10 +22,10 @@ test('kit trust: only "Trusted: yes (<version>)" on the first line, with a self-
     const kit = path.join(p.dir, '.ril', 'docs', 'verification', 'verify.md');
     assert.equal(kitTrust(p.dir), 'none', 'no kit yet');
     fs.mkdirSync(path.dirname(kit), { recursive: true });
-    const runs = [{ version: 'abc1234'.padEnd(40, '0') }];
+    const version = 'abc1234'.padEnd(40, '0');
     const trust = (text) => {
       fs.writeFileSync(kit, text);
-      return kitTrust(p.dir, runs);
+      return kitTrust(p.dir, [{ version, kit: kitHash(p.dir) }]);
     };
     const untrusted = {
       'an empty file': '',
@@ -56,7 +56,7 @@ test('kit trust: only "Trusted: yes (<version>)" on the first line, with a self-
     const trusted = {
       'a version': 'Trusted: yes (abc1234)\n',
       'any case': 'trusted: YES (ABC1234)\n',
-      'the full id': `Trusted: yes (${runs[0].version})\n\n# Verify\n`,
+      'the full id': `Trusted: yes (${version})\n\n# Verify\n`,
       'Windows line ends': 'Trusted: yes (abc1234)\r\n# Verify\r\n',
       'a byte order mark': '\uFEFFTrusted: yes (abc1234)\n',
     };

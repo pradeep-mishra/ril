@@ -77,15 +77,17 @@ export function evidence(dir, id = 'S1', name = 'run.txt') {
   return rel;
 }
 
-// Records a real self-run (verifier V1, two different evidence files) at the current saved version, then writes a
-// proof kit that trusts that version; `more` are extra lines under the first line.
+// Writes a proof kit, records a real self-run on it (verifier V1, two different evidence files, current saved
+// version), then makes its first line trust that version; `more` are extra lines under the first line.
 export function trustKit(dir, ...more) {
   if (!load(dir).agents.some((a) => a.id === 'V1')) register(dir, 'V1', 'verifier');
+  const file = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
+  const write = (first) => fs.writeFileSync(file, [first, ...more, '', '# Verify', ''].join('\n'));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  write('Trusted: no');
   const [broke, restored] = ['broken', 'restored'].map((name) => evidence(dir, 'kit', `${name}.txt`));
   ok(dir, 'ledger', 'selfrun', head(dir), '--break', broke, '--restored', restored, '--verifier', 'V1');
-  const file = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, [`Trusted: yes (${head(dir).slice(0, 7)})`, ...more, '', '# Verify', ''].join('\n'));
+  write(`Trusted: yes (${head(dir).slice(0, 7)})`);
 }
 
 export const addScenario = (dir, id = 'S1', method = 'cli') =>

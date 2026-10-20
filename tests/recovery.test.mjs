@@ -351,24 +351,15 @@ test('skip parks and logs', () => {
     ok(dir, 'skip', 'U1', '--reason', 'blocked on a missing tool');
     assert.equal(unit(dir, 'U1').state, 'parked');
     assert.equal(load(dir).decisions.at(-1).decision, 'Set aside unit U1');
+    const decisions = load(dir).decisions;
+    for (const id of ['S1', 'U1']) {
+      const again = ok(dir, 'skip', id, '--reason', 'again');
+      assert.match(again.stdout, /already set aside; nothing changed/);
+      assert.doesNotMatch(again.stdout + again.stderr, JARGON);
+    }
+    assert.deepEqual(load(dir).decisions, decisions, 'skipping twice changes nothing');
     assert.match(ok(dir, 'doctor').stdout, /S1/, 'doctor mentions what was set aside');
     assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /Nothing has been proven yet/, 'setting everything aside does not finish the project');
-  });
-});
-
-test('skip on something already set aside changes nothing', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'S1');
-    addUnit(dir, 'U1');
-    ok(dir, 'skip', 'S1', '--reason', 'down');
-    ok(dir, 'skip', 'U1', '--reason', 'stuck');
-    const before = load(dir);
-    for (const id of ['S1', 'U1']) {
-      const r = ok(dir, 'skip', id, '--reason', 'again');
-      assert.match(r.stdout, /already set aside; nothing changed/);
-      assert.doesNotMatch(r.stdout + r.stderr, JARGON);
-    }
-    assert.deepEqual(load(dir).decisions, before.decisions);
   });
 });
 
@@ -388,21 +379,16 @@ test('skip warns about a working agent and about a proof being set aside', () =>
   });
 });
 
-test('skip unknown id exits 2 with Next', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'S1');
-    const before = stateFiles(dir);
-    fails(dir, 2, 'skip', 'S9', '--reason', 'gone');
-    fails(dir, 1, 'skip', 'S1');
-    fails(dir, 2, 'skip', 'S1', '--unit', '--reason', 'not a unit');
-    assert.deepEqual(stateFiles(dir), before);
-  });
-});
-
-test('skip refuses an id that is both a unit and a scenario unless told which', () => {
+test('skip refuses an unknown id, and an id that is both a unit and a scenario unless told which', () => {
   withRepo((dir) => {
     addScenario(dir, 'X1');
     addUnit(dir, 'X1');
+    addScenario(dir, 'S1');
+    const untouched = stateFiles(dir);
+    fails(dir, 2, 'skip', 'S9', '--reason', 'gone');
+    fails(dir, 1, 'skip', 'S1');
+    fails(dir, 2, 'skip', 'S1', '--unit', '--reason', 'not a unit');
+    assert.deepEqual(stateFiles(dir), untouched);
     const r = fails(dir, 1, 'skip', 'X1', '--reason', 'stuck');
     assert.match(r.stderr, /--unit/);
     assert.match(r.stderr, /--scenario/);

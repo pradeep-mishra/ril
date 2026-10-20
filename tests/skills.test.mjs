@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
 import { checkBrief } from '../lib/brief.mjs';
-import { kitTrust } from '../lib/proof.mjs';
+import { kitHash, kitTrust } from '../lib/proof.mjs';
 import { headings, helpGroups, readFile, readRole, readSkill, repoRoot, rilCommandsIn, roleNames, skillNames } from './helpers/skills.mjs';
 
 // Structure only: the shape of skills, roles and templates, and that what they name exists. Wording is not pinned.
@@ -123,7 +123,7 @@ test('verify.md template starts "Trusted: no", so the kit is untrusted until its
     assert.equal(kitTrust(p.dir), 'untrusted');
     fs.writeFileSync(path.join(kit, 'verify.md'), text.replace(/^Trusted: no$/m, 'Trusted: yes (abc1234)'));
     assert.equal(kitTrust(p.dir), 'unshown', 'the line alone is not enough');
-    assert.equal(kitTrust(p.dir, [{ version: 'abc1234'.padEnd(40, '0') }]), 'trusted');
+    assert.equal(kitTrust(p.dir, [{ version: 'abc1234'.padEnd(40, '0'), kit: kitHash(p.dir) }]), 'trusted');
   } finally {
     p.cleanup();
   }

@@ -197,14 +197,8 @@ test('rail 3: a scenario criterion is frozen after confirm unless forced with a 
     ok(dir, 'scenario', 'update', 'S1', '--criterion', 'x', '--force', 'the person changed their mind');
     assert.equal(load(dir).scenarios[0].criterion, 'x');
     assert.match(ok(dir, 'decision', 'list').stdout, /the person changed their mind/);
-  });
-});
-
-test('rail 3 also holds for a project paused after confirm', () => {
-  withProject((dir) => {
-    addScenario(dir, 'S1');
-    for (const s of ['design', 'confirm', 'build', 'parked']) ok(dir, 'stage', 'set', s);
-    fails(dir, 1, 'scenario', 'update', 'S1', '--criterion', 'x');
+    ok(dir, 'stage', 'set', 'parked');
+    fails(dir, 1, 'scenario', 'update', 'S1', '--criterion', 'y'); // still frozen while paused after confirm
   });
 });
 
@@ -236,7 +230,7 @@ test('a scenario that was already tried can change only with a reason, and then 
   }
 });
 
-test('one reason covers both a tried scenario and the freeze after confirm, logged once', () => {
+test('one reason covers both a tried scenario and the freeze after confirm, logged once; a title-only change keeps the status', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
     for (const s of ['design', 'confirm', 'build']) ok(dir, 'stage', 'set', s);
@@ -245,17 +239,12 @@ test('one reason covers both a tried scenario and the freeze after confirm, logg
     const state = load(dir);
     assert.deepEqual([state.scenarios[0].method, state.scenarios[0].status, state.scenarios[0].round], ['api', 'unproven', 0]);
     assert.equal(state.decisions.length, 1);
-  });
-});
-
-test('changing only the title of a tried scenario keeps its status', () => {
-  withProject((dir) => {
-    addScenario(dir, 'S1');
-    tried(dir, 'S1', 'proven', 2);
-    fails(dir, 1, 'scenario', 'update', 'S1', '--title', 'new title');
-    ok(dir, 'scenario', 'update', 'S1', '--title', 'new title', '--force', 'typo');
-    const s = load(dir).scenarios[0];
-    assert.deepEqual([s.title, s.status, s.round], ['new title', 'proven', 2]);
+    addScenario(dir, 'S2');
+    tried(dir, 'S2', 'proven', 2);
+    fails(dir, 1, 'scenario', 'update', 'S2', '--title', 'new title');
+    ok(dir, 'scenario', 'update', 'S2', '--title', 'new title', '--force', 'typo');
+    const s2 = load(dir).scenarios[1];
+    assert.deepEqual([s2.title, s2.status, s2.round], ['new title', 'proven', 2], 'a title change alone keeps the status');
   });
 });
 
