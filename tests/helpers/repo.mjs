@@ -70,18 +70,22 @@ export function commitFile(dir, rel, text) {
   return head(dir);
 }
 
-export function evidence(dir, id = 'S1') {
-  const rel = `.ril/evidence/${id}/run.txt`;
+export function evidence(dir, id = 'S1', name = 'run.txt') {
+  const rel = `.ril/evidence/${id}/${name}`;
   fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
-  fs.writeFileSync(path.join(dir, rel), 'transcript\n');
+  fs.writeFileSync(path.join(dir, rel), `transcript ${name}\n`);
   return rel;
 }
 
-// Writes a proof kit whose first line says it is trusted, so verifiers may record results.
-export function trustKit(dir) {
+// Records a real self-run (verifier V1, two different evidence files) at the current saved version, then writes a
+// proof kit that trusts that version; `more` are extra lines under the first line.
+export function trustKit(dir, ...more) {
+  if (!load(dir).agents.some((a) => a.id === 'V1')) register(dir, 'V1', 'verifier');
+  const [broke, restored] = ['broken', 'restored'].map((name) => evidence(dir, 'kit', `${name}.txt`));
+  ok(dir, 'ledger', 'selfrun', head(dir), '--break', broke, '--restored', restored, '--verifier', 'V1');
   const file = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, 'Trusted: yes (shown failing on a broken copy)\n\n# Verify\n');
+  fs.writeFileSync(file, [`Trusted: yes (${head(dir).slice(0, 7)})`, ...more, '', '# Verify', ''].join('\n'));
 }
 
 export const addScenario = (dir, id = 'S1', method = 'cli') =>
@@ -99,8 +103,14 @@ export function writeBrief(dir, role, edit = (t) => t, name = role) {
 export const register = (dir, id, role) =>
   ok(dir, 'agent', 'register', id, '--role', role, '--task', `${role} work`, '--brief', role === 'verifier' ? fixture('agent-brief-good.md') : writeBrief(dir, role));
 
+// A verifier may only record for the scenario it was registered for: V1 for S1, V-<id> (made here) for the rest.
 export const record = (dir, scenario, checkpoint, verdict, extra = {}) => {
-  const opts = { evidence: evidence(dir, scenario), verifier: 'V1', review: 'clean', checks: '3', ...extra };
+  const who = scenario === 'S1' ? 'V1' : `V-${scenario}`;
+  if (!extra.verifier && who !== 'V1' && !load(dir).agents.some((a) => a.id === who)) {
+    ok(dir, 'agent', 'register', who, '--role', 'verifier', '--task', 'verifier work', '--unit', scenario, '--brief', fixture('agent-brief-good.md'));
+    ok(dir, 'agent', 'set', who, '--state', 'done', '--result', 'checked');
+  }
+  const opts = { evidence: evidence(dir, scenario), verifier: who, review: 'clean', checks: '3', ...extra };
   const args = ['ledger', 'record', scenario, checkpoint, verdict];
   for (const [k, v] of Object.entries(opts)) if (v !== null) args.push(`--${k}`, v);
   return ril(dir, ...args);

@@ -112,7 +112,7 @@ test('a filled feature map passes ril scenario coverage', () => {
   });
 });
 
-test('verify.md template starts "Trusted: no", so the kit is untrusted until its first line changes', () => {
+test('verify.md template starts "Trusted: no", so the kit is untrusted until its first line changes and a self-run exists', () => {
   const { text } = readFile('templates/verify.md');
   assert.equal(text.split('\n')[0], 'Trusted: no');
   const p = tmpProject();
@@ -122,7 +122,8 @@ test('verify.md template starts "Trusted: no", so the kit is untrusted until its
     fs.writeFileSync(path.join(kit, 'verify.md'), text);
     assert.equal(kitTrust(p.dir), 'untrusted');
     fs.writeFileSync(path.join(kit, 'verify.md'), text.replace(/^Trusted: no$/m, 'Trusted: yes (abc1234)'));
-    assert.equal(kitTrust(p.dir), 'trusted');
+    assert.equal(kitTrust(p.dir), 'unshown', 'the line alone is not enough');
+    assert.equal(kitTrust(p.dir, [{ version: 'abc1234'.padEnd(40, '0') }]), 'trusted');
   } finally {
     p.cleanup();
   }

@@ -149,6 +149,8 @@ test('rail 1 refuses everything but blocked while the kit is missing or not trus
     fs.writeFileSync(path.join(kit, 'verify.md'), '# Verify\n\nTrusted: yes\n');
     assert.equal(record(dir, 'S1', now, 'proven-cli').code, 1, 'a later line does not count');
     fs.writeFileSync(path.join(kit, 'verify.md'), 'Trusted: yes\n\n# Verify\n');
+    assert.match(fails(dir, 1, 'ledger', 'record', 'S1', now, 'proven-cli', '--evidence', evidence(dir), '--verifier', 'V1', '--review', 'clean', '--checks', '3').stderr, /not shown that it can fail/);
+    trustKit(dir);
     assert.equal(record(dir, 'S1', now, 'proven-cli').code, 0);
     assert.equal(status(dir), 'proven');
   });
@@ -296,12 +298,13 @@ test('record before anything is saved gives a plain error', () => {
     addScenario(dir);
     register(dir, 'V1', 'verifier');
     trustKit(dir);
+    fs.rmSync(path.join(dir, '.git'), { recursive: true });
     git(dir, 'init', '-q');
     const r = record(dir, 'S1', 'abcdef1', 'proven-cli');
     assert.equal(r.code, 1);
     assert.match(r.stderr, /ril checkpoint/);
     assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
-  }, { gitInit: false });
+  });
 });
 
 test('a done or failed agent must say what it did, so its unit is not held forever', () => {

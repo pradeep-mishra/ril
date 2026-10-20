@@ -102,20 +102,6 @@ test('two processes, no lost update', async () => {
   }
 });
 
-test('stale lock replaced', () => {
-  const { dir, cleanup } = project();
-  try {
-    fs.writeFileSync(lockFile(dir), `99999999 ${new Date().toISOString()}`);
-    mutate(dir, decide('dead pid'));
-    fs.writeFileSync(lockFile(dir), `${process.pid} ${new Date(Date.now() - 121_000).toISOString()}`);
-    mutate(dir, decide('old lock'));
-    assert.equal(load(dir).decisions.length, 2);
-    assert.equal(fs.existsSync(lockFile(dir)), false);
-  } finally {
-    cleanup();
-  }
-});
-
 test('live lock times out', async () => {
   const { dir, cleanup } = project();
   const holder = spawn(process.execPath, [child, dir, 'hold'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -158,12 +144,19 @@ test('mutate in a folder with no .ril asks for ril init', () => {
   }
 });
 
-test('many processes racing to clear one stale lock lose no update', async () => {
+test('stale locks are replaced (dead process, old lock), also with many processes racing to clear one', async () => {
   const { dir, cleanup } = project();
   try {
-    fs.writeFileSync(lockFile(dir), `99999999 ${new Date().toISOString()}`);
+    const dead = `99999999 ${new Date().toISOString()}`;
+    fs.writeFileSync(lockFile(dir), dead);
+    mutate(dir, decide('dead pid'));
+    fs.writeFileSync(lockFile(dir), `${process.pid} ${new Date(Date.now() - 121_000).toISOString()}`);
+    mutate(dir, decide('old lock'));
+    assert.equal(load(dir).decisions.length, 2);
+    assert.equal(fs.existsSync(lockFile(dir)), false);
+    fs.writeFileSync(lockFile(dir), dead);
     await Promise.all(Array.from({ length: 8 }, (_, i) => run([dir, 'mutate', '1', `c${i}`])));
-    assert.equal(load(dir).decisions.length, 8);
+    assert.equal(load(dir).decisions.length, 10);
     assert.equal(fs.existsSync(lockFile(dir) + '.break'), false);
   } finally {
     cleanup();

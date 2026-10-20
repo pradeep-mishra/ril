@@ -188,14 +188,23 @@ test('init --json reports what happened', () => {
   }
 });
 
-test('status oneline', () => {
+test('status prints one line, the full table with its agents, and json', () => {
   withProject((dir) => {
-    const r = ril(dir, 'status');
-    assert.equal(r.code, 0, r.stderr);
-    assert.equal(r.stdout.trim().split('\n').length, 1);
-    assert.match(r.stdout, /shape/);
-    assert.match(r.stdout, /Waiting on you: nothing\./);
-    assert.doesNotMatch(r.stdout, jargon);
+    const line = ril(dir, 'status');
+    assert.equal(line.code, 0, line.stderr);
+    assert.equal(line.stdout.trim().split('\n').length, 1);
+    assert.match(line.stdout, /shape/);
+    assert.match(line.stdout, /Waiting on you: nothing\./);
+    mutate(dir, (s) => {
+      s.agents.push({ id: 'a1', role: 'tester', unit: 'p1', task: 'write tests', state: 'done', result: '3 tests written', started: 't', updated: 't' });
+    });
+    const full = ril(dir, 'status', '--full');
+    assert.equal(full.code, 0, full.stderr);
+    for (const w of ['tester', 'write tests', 'finished', '3 tests written']) assert.ok(full.stdout.includes(w), w);
+    assert.doesNotMatch(line.stdout + full.stdout, jargon);
+    const j = JSON.parse(ril(dir, 'status', '--json').stdout);
+    assert.equal(j.stage, 'shape');
+    assert.equal(typeof j.summary, 'string');
   });
 });
 
@@ -212,26 +221,6 @@ test('status line reflects plans, scenarios, rounds and open questions', () => {
   s.agents = [{ id: 'a1', role: 'implementer', unit: 'p2', task: 'write the parser', state: 'running', result: '', started: 't', updated: 't' }];
   const text = full(s);
   for (const w of ['implementer', 'write the parser', 'working', 'demo', 'in progress']) assert.ok(text.includes(w), w);
-});
-
-test('status --full prints the agent table', () => {
-  withProject((dir) => {
-    mutate(dir, (s) => {
-      s.agents.push({ id: 'a1', role: 'tester', unit: 'p1', task: 'write tests', state: 'done', result: '3 tests written', started: 't', updated: 't' });
-    });
-    const r = ril(dir, 'status', '--full');
-    assert.equal(r.code, 0, r.stderr);
-    for (const w of ['tester', 'write tests', 'finished', '3 tests written']) assert.ok(r.stdout.includes(w), w);
-    assert.doesNotMatch(r.stdout, jargon);
-  });
-});
-
-test('status --json is machine readable', () => {
-  withProject((dir) => {
-    const j = JSON.parse(ril(dir, 'status', '--json').stdout);
-    assert.equal(j.stage, 'shape');
-    assert.equal(typeof j.summary, 'string');
-  });
 });
 
 test('error has Next', () => {

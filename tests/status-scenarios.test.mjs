@@ -26,22 +26,17 @@ test('status --full lists each scenario with a plain proof status', () => {
   assert.doesNotMatch(lines.slice(at, at + 6).join('\n'), /unproven|ledger|verdict/i);
 });
 
-test('Scenarios sits between the summary and the Plans', () => {
+test('Scenarios sits between the summary and the Plans, and says so when there are none', () => {
   const s = emptyState({ project: 'demo', mode: 'guided' });
+  const none = full(s).split('\n');
+  const at = none.indexOf('Scenarios:');
+  assert.ok(at > 0);
+  assert.deepEqual(none.slice(at + 1, at + 4), ['  No scenarios yet.', '', 'Agents:']);
   s.units = [{ id: 'p1', kind: 'plan', parent: null, title: 'P1', state: 'todo', checkpoint: null, updated: 't' }];
   s.scenarios = [sc('S1', 't', 'proven')];
   const text = full(s);
   assert.ok(text.indexOf('Scenarios:') < text.indexOf('Plans:'));
   assert.ok(text.indexOf('Plans:') < text.indexOf('Agents:'));
-});
-
-test('status --full says so when there are no scenarios', () => {
-  const lines = full(emptyState({ project: 'demo', mode: 'guided' })).split('\n');
-  const at = lines.indexOf('Scenarios:');
-  assert.ok(at > 0);
-  assert.equal(lines[at + 1], '  No scenarios yet.');
-  assert.equal(lines[at + 2], '');
-  assert.equal(lines[at + 3], 'Agents:');
 });
 
 test('the CLI shows an added scenario in status --full', () => {

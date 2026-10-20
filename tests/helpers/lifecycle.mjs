@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpProject } from './tmp.mjs';
-import { git, gitInit, head, ok, record, register } from './repo.mjs';
+import { git, gitInit, head, ok, record, register, trustKit } from './repo.mjs';
+
+export { trustKit };
 
 // A fresh git repo with a local identity, `ril init` already run (optionally with a fix-round cap) and one commit.
 // The caller calls cleanup().
@@ -53,7 +55,6 @@ export function writeFeatureMaps(dir, ids) {
 }
 
 export const advance = (dir, stages) => stages.forEach((stage) => ok(dir, 'stage', 'set', stage));
-export const trustKit = (dir) => writeDoc(dir, 'verification/verify.md', `Trusted: yes (shown failing on a broken copy of ${head(dir).slice(0, 7)})\n\n# Verify\n`);
 export const writeFinalReport = (dir) => writeDoc(dir, 'reports/final.md', '# Final report\n\nEvery scenario was proven.\n\n## What is not covered\n\nNothing beyond the spec.\n');
 
 // Everything before the proofs: scenarios, feature maps, stages up to accept, a verifier V1, a trusted kit,

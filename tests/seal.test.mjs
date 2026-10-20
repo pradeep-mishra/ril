@@ -3,18 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
-import { addScenario, commitFile, fails, git, head, ok, record, register, status, withRepo } from './helpers/repo.mjs';
+import { addScenario, commitFile, fails, git, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
 
-// A trusted kit whose second line is `second`.
-function kit(dir, second) {
-  const file = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `Trusted: yes\n${second}\n\n# Verify\n`);
-}
 const ready = (dir, second = 'Protected: tests/acceptance/, scripts/verify.sh') => {
   addScenario(dir);
   register(dir, 'V1', 'verifier');
-  kit(dir, second);
+  trustKit(dir, second);
 };
 const tree = (dir, p) => git(dir, 'rev-parse', `HEAD:${p}`);
 
@@ -57,7 +51,7 @@ test('a path that goes missing or appears counts as changed', () => {
     assert.match(record(dir, 'S1', head(dir), 'proven-cli').stderr, /scripts\/verify\.sh/);
     commitFile(dir, 'scripts/verify.sh', 'run\n');
     ok(dir, 'checkpoint', '--seal');
-    kit(dir, 'Protected: tests/acceptance/');
+    trustKit(dir, 'Protected: tests/acceptance/');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0, 'a sealed path that is still the same passes');
     commitFile(dir, 'tests/acceptance/new.sh', 'x\n');
     assert.match(record(dir, 'S1', head(dir), 'proven-cli').stderr, /tests\/acceptance/, 'a sealed null that now exists');
@@ -68,18 +62,18 @@ test('protected paths must be inside the project, need a seal, and a project wit
   withRepo((dir) => {
     ready(dir, 'Protected: ../outside.sh');
     for (const bad of ['../outside.sh', '/etc/passwd', 'a/../../b', 'C:/x']) {
-      kit(dir, `Protected: tests/acceptance/, ${bad}`);
+      trustKit(dir, `Protected: tests/acceptance/, ${bad}`);
       const r = record(dir, 'S1', head(dir), 'proven-cli');
       assert.equal(r.code, 1, bad);
       assert.match(r.stderr, /outside the project/);
       assert.match(r.stderr, /Next: /);
     }
-    kit(dir, 'Protected: tests/acceptance/');
+    trustKit(dir, 'Protected: tests/acceptance/');
     const noSeal = record(dir, 'S1', head(dir), 'proven-cli');
     assert.equal(noSeal.code, 1);
     assert.match(noSeal.stderr, /sealed yet/);
     for (const second of ['', 'Notes: nothing protected']) {
-      kit(dir, second);
+      trustKit(dir, second);
       assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0, second);
     }
     assert.equal(ok(dir, 'checkpoint').stderr, '', 'no warning without a seal');

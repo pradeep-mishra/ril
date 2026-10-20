@@ -107,7 +107,7 @@ test('damaged state and damaged backup: nothing is touched', () => {
   });
 });
 
-test('stale lock cleared', () => {
+test('doctor clears a dead, old or empty lock and leaves one held by a running command alone', () => {
   withRepo((dir) => {
     fs.writeFileSync(lockFile(dir), `${deadPid()} ${new Date().toISOString()}`);
     reportsThenFixes(dir, 0);
@@ -116,21 +116,10 @@ test('stale lock cleared', () => {
     fs.writeFileSync(lockFile(dir), `${process.pid} ${minutesAgo(10)}`);
     reportsThenFixes(dir, 0);
     assert.ok(!fs.existsSync(lockFile(dir)), 'a lock older than two minutes is cleared even when its process lives');
-  });
-});
-
-test('an empty lock left by a command killed while taking it is cleared', () => {
-  withRepo((dir) => {
     fs.writeFileSync(lockFile(dir), '');
-    const r = ok(dir, 'doctor', '--fix');
-    assert.match(r.stdout, /lock/);
+    assert.match(ok(dir, 'doctor', '--fix').stdout, /lock/, 'an empty lock left by a killed command');
     assert.ok(!fs.existsSync(lockFile(dir)));
     ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'Go on', '--why', 'the lock is gone');
-  });
-});
-
-test('a lock held by a running command is left alone', () => {
-  withRepo((dir) => {
     const held = `${process.pid} ${new Date().toISOString()}`;
     fs.writeFileSync(lockFile(dir), held);
     ok(dir, 'doctor', '--fix', '--quiet');
@@ -188,17 +177,6 @@ test('an agent last updated in the future counts as no longer running', () => {
   });
 });
 
-test('dead agent stopped with --new-session', () => {
-  withRepo((dir) => {
-    addUnit(dir, 'U1');
-    addAgent(dir, 'A1', { minutes: 2 });
-    reportsThenFixes(dir, 2, '--new-session');
-    assert.equal(agent(dir, 'A1').state, 'stopped');
-    assert.equal(unit(dir, 'U1').state, 'todo', 'its unit goes back to not started');
-    settled(dir);
-  });
-});
-
 test('young agent left alone without --new-session', () => {
   withRepo((dir) => {
     addUnit(dir, 'U1');
@@ -212,15 +190,19 @@ test('young agent left alone without --new-session', () => {
   });
 });
 
-test('65-minute-old agent stopped', () => {
+test('a running agent is stopped when it is 65 minutes old or a new session starts, and a failed one is left alone', () => {
   withRepo((dir) => {
     addUnit(dir, 'U1');
+    addUnit(dir, 'U2');
     addAgent(dir, 'A1', { minutes: 65 });
     addAgent(dir, 'A2', { unit: 'S9', minutes: 65, state: 'failed' });
+    addAgent(dir, 'A3', { unit: 'U2', minutes: 2 });
     reportsThenFixes(dir, 2);
-    assert.equal(agent(dir, 'A1').state, 'stopped');
-    assert.equal(agent(dir, 'A2').state, 'failed', 'only running agents are touched');
-    assert.equal(unit(dir, 'U1').state, 'todo');
+    assert.deepEqual(['A1', 'A2', 'A3'].map((id) => agent(dir, id).state), ['stopped', 'failed', 'running'], 'only old running agents are touched');
+    assert.deepEqual(['U1', 'U2'].map((id) => unit(dir, id).state), ['todo', 'doing']);
+    reportsThenFixes(dir, 2, '--new-session');
+    assert.equal(agent(dir, 'A3').state, 'stopped');
+    assert.equal(unit(dir, 'U2').state, 'todo', 'its unit goes back to not started');
     settled(dir);
   });
 });

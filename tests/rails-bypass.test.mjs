@@ -66,13 +66,6 @@ test('only an "Accepted as unproven: <id>" decision lets a parked scenario throu
   });
 });
 
-test('done is refused with no scenarios', () => {
-  withRepo((dir) => {
-    toAccept(dir);
-    assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /There are no scenarios, so nothing has been proven/);
-  });
-});
-
 test('done needs every proof at the current saved version', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
@@ -278,25 +271,27 @@ test('carry is strict about what counts as a trivial change', () => {
   });
 });
 
-test('carry sees changes outside the project folder in an enclosing repo', () => {
-  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outer-'));
-  try {
-    gitInit(outer);
-    const dir = path.join(outer, 'app');
-    fs.mkdirSync(dir);
-    ok(dir, 'init');
-    addScenario(dir, 'S1');
-    register(dir, 'V1', 'verifier');
-    trustKit(dir);
-    const from = ok(dir, 'checkpoint').stdout.trim();
-    assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
-    fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
-    git(outer, 'add', 'shared.js');
-    git(outer, 'commit', '-q', '-m', 'outside change');
-    const r = fails(dir, 2, 'ledger', 'carry', 'S1', from, head(outer));
-    assert.match(r.stderr, /shared\.js/);
-  } finally {
-    fs.rmSync(outer, { recursive: true, force: true });
+test('carry sees changes outside the project folder in an enclosing repo, whatever diff.relative says', () => {
+  for (const relative of ['false', 'true']) {
+    const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outer-'));
+    try {
+      gitInit(outer);
+      git(outer, 'config', 'diff.relative', relative);
+      const dir = path.join(outer, 'app');
+      fs.mkdirSync(dir);
+      ok(dir, 'init');
+      addScenario(dir, 'S1');
+      register(dir, 'V1', 'verifier');
+      const from = ok(dir, 'checkpoint').stdout.trim();
+      trustKit(dir);
+      assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
+      fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
+      git(outer, 'add', 'shared.js');
+      git(outer, 'commit', '-q', '-m', 'outside change');
+      assert.match(fails(dir, 2, 'ledger', 'carry', 'S1', from, head(outer)).stderr, /shared\.js/, relative);
+    } finally {
+      fs.rmSync(outer, { recursive: true, force: true });
+    }
   }
 });
 

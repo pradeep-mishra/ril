@@ -2,7 +2,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { load, mutate, statePath } from '../lib/store.mjs';
 import { addScenario, fails, head, ok, record, register, status, writeBrief } from './helpers/repo.mjs';
@@ -133,7 +132,8 @@ test('recovery path: a working agent with no report is stopped in a new session 
     assert.equal(agent('V1').state, 'stopped', 'every working agent without a report is stopped');
 
     register(dir, 'V2', 'verifier');
-    prove(dir, IDS, { verifier: 'V2' });
+    prove(dir, ['S1'], { verifier: 'V2' });
+    prove(dir, ['S2']);
     advance(dir, ['accept']);
     ok(dir, 'stage', 'set', 'done');
   });
@@ -213,35 +213,22 @@ test('real accept order: proofs first, then the report and README, then the pass
 });
 
 // Each row is one way of trying to get past a rail. Every refusal must say what to do next.
-function outside(dir) {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outside-'));
-  try {
-    const file = path.join(scratch, 'run.txt');
-    fs.writeFileSync(file, 'a transcript kept elsewhere\n');
-    return record(dir, 'S1', head(dir), 'proven-cli', { evidence: file });
-  } finally {
-    fs.rmSync(scratch, { recursive: true, force: true });
-  }
-}
-
 test('rail refusals', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
     register(dir, 'I1', 'implementer');
     const kit = (text) => writeDoc(dir, 'verification/verify.md', `${text}\n\n# Verify\n`);
+    const own = () => trustKit(dir);
     const proof = (verdict, extra) => () => record(dir, 'S1', head(dir), verdict, extra);
     const table = [
       ['a missing kit refuses a proof', null, proof('proven-cli'), 1, /proof kit has not been written yet/],
-      ['a missing kit refuses a failure too', null, proof('failed'), 1, /proof kit has not been written yet/],
-      ['a non-verifier records a proof', () => kit('Trusted: yes'), proof('proven-cli', { verifier: 'I1' }), 1, /only a verifier/],
+      ['a non-verifier records a proof', own, proof('proven-cli', { verifier: 'I1' }), 1, /only a verifier/],
       ['an untrusted kit refuses a proof', () => kit('Trusted: no'), proof('proven-cli'), 1, /not trusted/],
-      ['an untrusted kit refuses a failure too', null, proof('failed'), 1, /not trusted/],
+      ['a hand-typed yes with no self-run', () => kit('Trusted: yes'), proof('proven-cli'), 1, /not shown that it can fail/],
       ['blocked is accepted but proves nothing', null, proof('blocked', { review: 'none', checks: null }), 0, /could not be checked/],
-      ['zero checks', () => kit('Trusted: yes'), proof('proven-cli', { checks: '0' }), 1, /no checks ran/],
-      ['evidence outside the project', null, () => outside(dir), 1, /evidence belongs under \.ril\/evidence\/S1\/<saved version>\//],
-      ['a product file as evidence', null, proof('proven-cli', { evidence: 'README.md' }), 1, /evidence belongs under \.ril\/evidence\/S1\/<saved version>\//],
-      ['a kit trusted only on a later line', () => writeDoc(dir, 'verification/verify.md', '# Verify\n\nTrusted: yes\n'), proof('proven-cli'), 1, /not trusted/],
+      ['zero checks', own, proof('proven-cli', { checks: '0' }), 1, /no checks ran/],
+      ['a verifier registered for another scenario', () => (own(), addScenario(dir, 'S2')), () => record(dir, 'S2', head(dir), 'proven-cli', { verifier: 'V1' }), 1, /registered for S1, not for scenario S2/],
       ['done with zero scenarios', null, () => withProject((empty) => ril(empty, 'stage', 'set', 'done')), 1, /no scenarios/],
       ['a decision that only mentions the scenario', null, () => {
         mutate(dir, (s) => void (s.scenarios[0].status = 'parked'));

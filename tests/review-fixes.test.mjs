@@ -2,14 +2,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
 import { kitTrust } from '../lib/proof.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpProject } from './helpers/tmp.mjs';
-import { addScenario, fails, git, gitInit, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
+import { addScenario, fails, git, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
 
 const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ril');
 
@@ -17,38 +16,16 @@ const toAccept = (dir) => {
   for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
 };
 
-test('a user setting diff.relative does not hide changes outside the project from carry', () => {
-  const outer = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outer-'));
-  try {
-    gitInit(outer);
-    git(outer, 'config', 'diff.relative', 'true');
-    const dir = path.join(outer, 'app');
-    fs.mkdirSync(dir);
-    ok(dir, 'init');
-    addScenario(dir, 'S1');
-    register(dir, 'V1', 'verifier');
-    trustKit(dir);
-    const from = ok(dir, 'checkpoint').stdout.trim();
-    assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
-    fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
-    git(outer, 'add', 'shared.js');
-    git(outer, 'commit', '-q', '-m', 'outside change');
-    const r = fails(dir, 2, 'ledger', 'carry', 'S1', from, head(outer));
-    assert.match(r.stderr, /shared\.js/);
-  } finally {
-    fs.rmSync(outer, { recursive: true, force: true });
-  }
-});
-
-test('kit trust: only "Trusted: yes" on the first line of verify.md counts', () => {
+test('kit trust: only "Trusted: yes (<version>)" on the first line, with a self-run for that version, counts', () => {
   const p = tmpProject();
   try {
     const kit = path.join(p.dir, '.ril', 'docs', 'verification', 'verify.md');
     assert.equal(kitTrust(p.dir), 'none', 'no kit yet');
     fs.mkdirSync(path.dirname(kit), { recursive: true });
+    const runs = [{ version: 'abc1234'.padEnd(40, '0') }];
     const trust = (text) => {
       fs.writeFileSync(kit, text);
-      return kitTrust(p.dir);
+      return kitTrust(p.dir, runs);
     };
     const untrusted = {
       'an empty file': '',
@@ -68,15 +45,23 @@ test('kit trust: only "Trusted: yes" on the first line of verify.md counts', () 
       'a comment': '<!-- Trusted: yes -->\n',
     };
     for (const [what, text] of Object.entries(untrusted)) assert.equal(trust(text), 'untrusted', what);
-    const trusted = {
-      'plain': 'Trusted: yes\n',
+    const unshown = {
+      'a bare yes': 'Trusted: yes\n',
       'no line end': 'Trusted: yes',
-      'any case': 'trusted: YES\n',
-      'a note in brackets': 'Trusted: yes (shown failing on a broken copy)\n\n# Verify\n',
-      'Windows line ends': 'Trusted: yes\r\n# Verify\r\n',
-      'a byte order mark': '\uFEFFTrusted: yes\n',
+      'a note that is not a version': 'Trusted: yes (shown failing on a broken copy)\n',
+      'a version too short': 'Trusted: yes (abc12)\n',
+      'a version with no self-run row': 'Trusted: yes (def5678)\n',
+    };
+    for (const [what, text] of Object.entries(unshown)) assert.equal(trust(text), 'unshown', what);
+    const trusted = {
+      'a version': 'Trusted: yes (abc1234)\n',
+      'any case': 'trusted: YES (ABC1234)\n',
+      'the full id': `Trusted: yes (${runs[0].version})\n\n# Verify\n`,
+      'Windows line ends': 'Trusted: yes (abc1234)\r\n# Verify\r\n',
+      'a byte order mark': '\uFEFFTrusted: yes (abc1234)\n',
     };
     for (const [what, text] of Object.entries(trusted)) assert.equal(trust(text), 'trusted', what);
+    assert.equal(kitTrust(p.dir), 'unshown', 'no self-runs at all (an old state)');
   } finally {
     p.cleanup();
   }

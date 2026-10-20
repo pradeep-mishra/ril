@@ -83,11 +83,11 @@ try {
 
   let trust = 'none';
   try {
-    trust = kitTrust(dir);
+    trust = kitTrust(dir, state.selfruns);
   } catch {
     trust = 'unreadable';
   }
-  if (trust !== 'trusted') fail('The proof kit (.ril/docs/verification/verify.md) is missing, or its first line does not say "Trusted: yes".');
+  if (trust !== 'trusted') fail('The proof kit (.ril/docs/verification/verify.md) is missing, or its first line does not say "Trusted: yes (<saved version>)" with a recorded self-run for that version.');
 
   const dirty = git('status', '--porcelain');
   if (dirty.status !== 0) fail('git could not say whether the project is clean.');
