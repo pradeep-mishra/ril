@@ -46,6 +46,7 @@ try {
   if (!now) fail('The folder has no saved version (git has no commit here).');
   if (state.stage !== 'done') fail(`The stage is ${state.stage}, not done.`);
   if (!state.scenarios.length) fail('The project has no scenarios.');
+  else if (!state.scenarios.some((s) => s?.status === 'proven')) fail('No scenario is proven; setting every scenario aside does not finish a project.');
 
   for (const s of state.scenarios) {
     if (s.status === 'parked') {
@@ -86,7 +87,7 @@ try {
   } catch {
     trust = 'unreadable';
   }
-  if (trust !== 'trusted') fail('The proof kit (.ril/docs/verification/verify.md) does not say "Trusted: yes" on a line of its own.');
+  if (trust !== 'trusted') fail('The proof kit (.ril/docs/verification/verify.md) is missing, or its first line does not say "Trusted: yes".');
 
   const dirty = git('status', '--porcelain');
   if (dirty.status !== 0) fail('git could not say whether the project is clean.');

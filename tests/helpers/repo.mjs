@@ -77,6 +77,13 @@ export function evidence(dir, id = 'S1') {
   return rel;
 }
 
+// Writes a proof kit whose first line says it is trusted, so verifiers may record results.
+export function trustKit(dir) {
+  const file = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, 'Trusted: yes (shown failing on a broken copy)\n\n# Verify\n');
+}
+
 export const addScenario = (dir, id = 'S1', method = 'cli') =>
   ok(dir, 'scenario', 'add', id, '--title', `Title ${id}`, '--method', method, '--criterion', `Criterion ${id}`);
 

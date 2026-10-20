@@ -4,5 +4,5 @@
   "type": "module",
   "bin": { "ril": "bin/ril" },
   "scripts": { "test": "node --test" },
-  "engines": { "node": ">=20" }
+  "engines": { "node": ">=20.10" }
 }

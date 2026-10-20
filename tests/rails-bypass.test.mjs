@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ril } from './helpers/ril.mjs';
 import { load } from '../lib/store.mjs';
-import { addScenario, commitFile, fails, fixture, git, gitInit, head, lines, ok, record, register, status, withRepo, writeBrief } from './helpers/repo.mjs';
+import { addScenario, commitFile, fails, fixture, git, gitInit, head, lines, ok, record, register, status, trustKit, withRepo, writeBrief } from './helpers/repo.mjs';
 
 const toAccept = (dir) => {
   for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
@@ -23,6 +23,7 @@ test('only an "Accepted risk for <id>" decision lets risks through', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
     ok(dir, '--force', 'x', 'scenario', 'update', 'S1', '--criterion', 'newer');
     assert.equal(status(dir), 'unproven');
@@ -57,6 +58,10 @@ test('only an "Accepted as unproven: <id>" decision lets a parked scenario throu
     park(dir, 'S1');
     fails(dir, 1, 'stage', 'set', 'done');
     ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Accepted as unproven: S1', '--why', 'the sandbox is down');
+    addScenario(dir, 'S2');
+    register(dir, 'V1', 'verifier');
+    trustKit(dir);
+    assert.equal(record(dir, 'S2', head(dir), 'proven-cli').code, 0);
     ok(dir, 'stage', 'set', 'done');
   });
 });
@@ -72,6 +77,7 @@ test('done needs every proof at the current saved version', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     toAccept(dir);
     const first = head(dir);
     assert.equal(record(dir, 'S1', first, 'proven-cli').code, 0);
@@ -155,10 +161,11 @@ test('checkpoint in a project nested in a larger repo saves only the project', (
   }
 });
 
-test('evidence must be a non-empty file inside the project', () => {
+test('evidence must be a non-empty file under .ril/evidence', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-outside-'));
     try {
       fs.writeFileSync(path.join(outside, 'proof.txt'), 'looks real\n');
@@ -171,10 +178,17 @@ test('evidence must be a non-empty file inside the project', () => {
         'a full path outside': path.join(outside, 'proof.txt'),
         'an empty file': '.ril/evidence/S1/empty.txt',
         'a missing file': '.ril/evidence/S1/none.txt',
+        'a product file': 'README.md',
+        'a product file by its full path': path.join(dir, 'README.md'),
+        'a ril file outside the evidence folder': '.ril/.gitignore',
+        'the evidence folder itself': '.ril/evidence',
+        'an escape from the evidence folder': '.ril/evidence/../../README.md',
       };
       try {
         fs.symlinkSync(path.join(outside, 'proof.txt'), path.join(dir, '.ril', 'evidence', 'S1', 'link.txt'));
         cases['a link to outside'] = '.ril/evidence/S1/link.txt';
+        fs.symlinkSync(path.join(dir, 'README.md'), path.join(dir, '.ril', 'evidence', 'S1', 'readme-link.txt'));
+        cases['a link to a product file'] = '.ril/evidence/S1/readme-link.txt';
       } catch {
         // creating links needs extra rights on some systems
       }
@@ -182,11 +196,13 @@ test('evidence must be a non-empty file inside the project', () => {
         const r = record(dir, 'S1', head(dir), 'proven-cli', { evidence: given });
         assert.equal(r.code, 1, `${what}: ${r.stdout}${r.stderr}`);
         assert.match(r.stderr, /Next: /, what);
-        assert.doesNotMatch(r.stderr, /does not exist in the project/, what);
+        assert.match(r.stderr, /evidence belongs under \.ril\/evidence\/S1\/<saved version>\//, what);
       }
       assert.equal(status(dir), 'unproven');
+      assert.deepEqual(load(dir).ledger, []);
       assert.match(record(dir, 'S1', head(dir), 'proven-cli', { evidence: '.ril/evidence/S1/empty.txt' }).stderr, /empty/);
-      assert.match(record(dir, 'S1', head(dir), 'proven-cli', { evidence: path.join(outside, 'proof.txt') }).stderr, /outside/);
+      assert.match(record(dir, 'S1', head(dir), 'proven-cli', { evidence: path.join(outside, 'proof.txt') }).stderr, /outside \.ril\/evidence/);
+      assert.match(record(dir, 'S1', head(dir), 'proven-cli', { evidence: 'README.md' }).stderr, /outside \.ril\/evidence/);
     } finally {
       fs.rmSync(outside, { recursive: true, force: true });
     }
@@ -197,6 +213,7 @@ test('blocked never takes away a pass; failed replaces it', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const now = head(dir);
     assert.equal(record(dir, 'S1', now, 'proven-cli').code, 0);
     const blocked = record(dir, 'S1', now, 'blocked', { review: 'none' });
@@ -213,20 +230,23 @@ test('blocked never takes away a pass; failed replaces it', () => {
   });
 });
 
-test('the kit counts as trusted only when it says "Trusted: yes"', () => {
+test('the kit counts as trusted only when its first line says "Trusted: yes"', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
     const kit = path.join(dir, '.ril', 'docs', 'verification', 'verify.md');
+    const missing = record(dir, 'S1', head(dir), 'proven-cli');
+    assert.equal(missing.code, 1, 'no kit at all');
+    assert.match(missing.stderr, /proof kit has not been written yet/);
     fs.mkdirSync(path.dirname(kit), { recursive: true });
-    const untrusted = ['# Verify\n', 'Trusted: no (not shown failing yet)\n', '**Trusted:** no\n', 'Trusted: maybe\n', '```\nTrusted: yes\n```\n'];
+    const untrusted = ['# Verify\n', 'Trusted: no (not shown failing yet)\n', '**Trusted:** no\n', 'Trusted: maybe\n', 'Trusted: yes/no\n', 'Trusted: yesterday\n', '# Verify\n\nTrusted: yes\n', '```\nTrusted: yes\n```\n'];
     for (const text of untrusted) {
       fs.writeFileSync(kit, text);
       const r = record(dir, 'S1', head(dir), 'proven-cli');
       assert.equal(r.code, 1, JSON.stringify(text));
       assert.match(r.stderr, /trusted/i);
     }
-    fs.writeFileSync(kit, '# Verify\r\n\r\n  trusted: YES\r\n');
+    fs.writeFileSync(kit, 'trusted: YES (shown failing)\r\n\r\n# Verify\r\n');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
   });
 });
@@ -235,6 +255,7 @@ test('a verifier that failed or was stopped cannot record', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     for (const state of ['failed', 'stopped']) {
       ok(dir, 'agent', 'set', 'V1', '--state', state, '--result', `it ${state}`);
       assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 1, state);
@@ -249,6 +270,7 @@ test('carry is strict about what counts as a trivial change', () => {
     addScenario(dir, 'S1');
     addScenario(dir, 'G1', 'golden');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const base = head(dir);
     assert.equal(record(dir, 'S1', base, 'proven-cli').code, 0);
     assert.equal(record(dir, 'G1', base, 'proven-golden').code, 0);
@@ -286,6 +308,7 @@ test('carry sees changes outside the project folder in an enclosing repo', () =>
     ok(dir, 'init');
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const from = ok(dir, 'checkpoint').stdout.trim();
     assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
     fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
@@ -302,6 +325,7 @@ test('record refuses while the project has unsaved changes', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     fs.writeFileSync(path.join(dir, 'app.js'), 'not saved yet\n');
     const r = record(dir, 'S1', head(dir), 'proven-cli');
     assert.equal(r.code, 1);

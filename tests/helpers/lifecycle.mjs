@@ -53,7 +53,7 @@ export function writeFeatureMaps(dir, ids) {
 }
 
 export const advance = (dir, stages) => stages.forEach((stage) => ok(dir, 'stage', 'set', stage));
-export const trustKit = (dir) => writeDoc(dir, 'verification/verify.md', `# Verify\n\nTrusted: yes (${head(dir).slice(0, 7)})\n`);
+export const trustKit = (dir) => writeDoc(dir, 'verification/verify.md', `Trusted: yes (shown failing on a broken copy of ${head(dir).slice(0, 7)})\n\n# Verify\n`);
 export const writeFinalReport = (dir) => writeDoc(dir, 'reports/final.md', '# Final report\n\nEvery scenario was proven.\n\n## What is not covered\n\nNothing beyond the spec.\n');
 
 // Everything before the proofs: scenarios, feature maps, stages up to accept, a verifier V1, a trusted kit,

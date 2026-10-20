@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tmpProject } from './helpers/tmp.mjs';
 import { load } from '../lib/store.mjs';
-import { addScenario, commitFile, evidence, fails, fixture, git, head, lines, ok, record, register, status, withRepo, writeBrief } from './helpers/repo.mjs';
+import { addScenario, commitFile, evidence, fails, fixture, git, head, lines, ok, record, register, status, trustKit, withRepo, writeBrief } from './helpers/repo.mjs';
 
 test('register refuses unknown role and incomplete brief', () => {
   withRepo((dir) => {
@@ -53,6 +53,7 @@ test('rail 1 table', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1', 'cli');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     register(dir, 'I1', 'implementer');
     const now = head(dir);
 
@@ -62,6 +63,7 @@ test('rail 1 table', () => {
       ['a wrong checkpoint', ['0000000', 'proven-cli', {}]],
       ['a too short checkpoint', [now.slice(0, 6), 'proven-cli', {}]],
       ['missing evidence', [now, 'proven-cli', { evidence: '.ril/evidence/S1/none.txt' }]],
+      ['a product file as evidence', [now, 'proven-cli', { evidence: 'README.md' }]],
       ['a method mismatch', [now, 'proven-ui', {}]],
       ['review none', [now, 'proven-cli', { review: 'none' }]],
       ['review risks without a decision', [now, 'proven-cli', { review: 'risks' }]],
@@ -120,14 +122,22 @@ test('rail 1 table', () => {
   });
 });
 
-test('rail 1 refuses everything but blocked while the kit is not trusted', () => {
+test('rail 1 refuses everything but blocked while the kit is missing or not trusted', () => {
   withRepo((dir) => {
     addScenario(dir);
     register(dir, 'V1', 'verifier');
     const kit = path.join(dir, '.ril', 'docs', 'verification');
-    fs.mkdirSync(kit, { recursive: true });
-    fs.writeFileSync(path.join(kit, 'verify.md'), '# Verify\n\nTrusted: no\n');
     const now = head(dir);
+    for (const verdict of ['proven-cli', 'failed']) {
+      const r = record(dir, 'S1', now, verdict);
+      assert.equal(r.code, 1, verdict);
+      assert.match(r.stderr, /proof kit has not been written yet/);
+      assert.match(r.stderr, /Next: /);
+    }
+    assert.equal(record(dir, 'S1', now, 'blocked').code, 0, 'blocked is accepted without a kit');
+    assert.equal(status(dir), 'unproven');
+    fs.mkdirSync(kit, { recursive: true });
+    fs.writeFileSync(path.join(kit, 'verify.md'), 'Trusted: no\n\n# Verify\n');
     for (const verdict of ['proven-cli', 'failed']) {
       const r = record(dir, 'S1', now, verdict);
       assert.equal(r.code, 1, verdict);
@@ -137,6 +147,8 @@ test('rail 1 refuses everything but blocked while the kit is not trusted', () =>
     assert.equal(record(dir, 'S1', now, 'blocked').code, 0);
     assert.equal(status(dir), 'unproven');
     fs.writeFileSync(path.join(kit, 'verify.md'), '# Verify\n\nTrusted: yes\n');
+    assert.equal(record(dir, 'S1', now, 'proven-cli').code, 1, 'a later line does not count');
+    fs.writeFileSync(path.join(kit, 'verify.md'), 'Trusted: yes\n\n# Verify\n');
     assert.equal(record(dir, 'S1', now, 'proven-cli').code, 0);
     assert.equal(status(dir), 'proven');
   });
@@ -146,6 +158,7 @@ test('failed then proven', () => {
   withRepo((dir) => {
     addScenario(dir);
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     assert.equal(record(dir, 'S1', head(dir), 'failed', { review: 'none', checks: '2' }).code, 0);
     assert.equal(status(dir), 'failing');
     fails(dir, 2, 'ledger', 'check', 'S1', head(dir));
@@ -160,6 +173,7 @@ test('carry', () => {
   withRepo((dir) => {
     addScenario(dir);
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const first = head(dir);
     assert.equal(record(dir, 'S1', first, 'proven-cli').code, 0);
 
@@ -193,6 +207,7 @@ test('rail 2', () => {
     addScenario(dir, 'S1');
     addScenario(dir, 'S2');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
 
@@ -218,7 +233,31 @@ test('rail 2', () => {
     fs.writeFileSync(path.join(dir, '.ril', 'state.json'), JSON.stringify(raw));
     assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /S1/, 'parked without a decision is refused');
     ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Accepted as unproven: S1', '--why', 'the payment sandbox is down');
+    addScenario(dir, 'S2');
+    register(dir, 'V1', 'verifier');
+    trustKit(dir);
+    assert.equal(record(dir, 'S2', head(dir), 'proven-cli').code, 0);
     ok(dir, 'stage', 'set', 'done');
+  });
+});
+
+test('rail 2: a project where every scenario was set aside is not finished', () => {
+  withRepo((dir) => {
+    addScenario(dir, 'S1');
+    addScenario(dir, 'S2');
+    for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
+    ok(dir, 'skip', 'S1', '--reason', 'the sandbox is down');
+    ok(dir, 'skip', 'S2', '--reason', 'out of scope');
+    const refused = fails(dir, 1, 'stage', 'set', 'done');
+    assert.match(refused.stderr, /^Nothing has been proven yet, so the project cannot be finished\./m);
+    assert.match(refused.stderr, /Next: .*stop report.*ril stage set parked/);
+    assert.doesNotMatch(refused.stderr, /S1|S2/);
+    const forced = fails(dir, 1, '--force', 'ship it anyway', 'stage', 'set', 'done');
+    assert.match(forced.stderr, /Nothing has been proven yet/);
+    assert.match(forced.stderr, /force/i);
+    assert.equal(load(dir).stage, 'accept');
+    ok(dir, 'stage', 'set', 'parked');
+    assert.equal(load(dir).stage, 'parked');
   });
 });
 
@@ -256,6 +295,7 @@ test('record before anything is saved gives a plain error', () => {
   withRepo((dir) => {
     addScenario(dir);
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     git(dir, 'init', '-q');
     const r = record(dir, 'S1', 'abcdef1', 'proven-cli');
     assert.equal(r.code, 1);

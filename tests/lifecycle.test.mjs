@@ -80,6 +80,20 @@ test('cap path: the cap stops the rounds, a skip records the acceptance, the res
   }, { cap: 5 });
 });
 
+test('cap path: when every scenario is set aside, done is refused and the project is paused instead', () => {
+  withProject((dir) => {
+    ready(dir, IDS);
+    for (const id of IDS) ok(dir, 'skip', id, '--reason', 'stuck after every fix round');
+    const refused = fails(dir, 1, 'stage', 'set', 'done');
+    assert.match(refused.stderr, /Nothing has been proven yet, so the project cannot be finished\./);
+    assert.match(refused.stderr, /Next: .*stop report.*ril stage set parked/);
+    fails(dir, 1, '--force', 'the person wants to stop', 'stage', 'set', 'done');
+    assert.equal(load(dir).stage, 'accept');
+    ok(dir, 'stage', 'set', 'parked');
+    assert.match(ok(dir, 'stage', 'get').stdout, /paused/);
+  });
+});
+
 test('recovery path: damaged state is restored from the backup and the project goes on to done', () => {
   withProject((dir) => {
     ready(dir, IDS);
@@ -149,6 +163,8 @@ test('stale path: a product change after the proof makes done refuse, and carry 
     ok(dir, 'checkpoint');
     const b = head(dir);
     assert.notEqual(a, b);
+    assert.equal(ok(dir, 'doctor', '--fix', '--quiet').stdout, '', 'a later saved version is not a repair');
+    assert.deepEqual(load(dir).scenarios.map((s) => s.status), ['proven', 'proven'], 'only re-checking or carry moves the proof forward');
     const refused = fails(dir, 1, 'stage', 'set', 'done');
     assert.match(refused.stderr, /older version/);
     assert.match(refused.stderr, /S1[\s\S]*S2/);
@@ -213,15 +229,19 @@ test('rail refusals', () => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
     register(dir, 'I1', 'implementer');
-    const kit = (text) => writeDoc(dir, 'verification/verify.md', `# Verify\n\n${text}\n`);
+    const kit = (text) => writeDoc(dir, 'verification/verify.md', `${text}\n\n# Verify\n`);
     const proof = (verdict, extra) => () => record(dir, 'S1', head(dir), verdict, extra);
     const table = [
+      ['a missing kit refuses a proof', null, proof('proven-cli'), 1, /proof kit has not been written yet/],
+      ['a missing kit refuses a failure too', null, proof('failed'), 1, /proof kit has not been written yet/],
       ['a non-verifier records a proof', () => kit('Trusted: yes'), proof('proven-cli', { verifier: 'I1' }), 1, /only a verifier/],
       ['an untrusted kit refuses a proof', () => kit('Trusted: no'), proof('proven-cli'), 1, /not trusted/],
       ['an untrusted kit refuses a failure too', null, proof('failed'), 1, /not trusted/],
       ['blocked is accepted but proves nothing', null, proof('blocked', { review: 'none', checks: null }), 0, /could not be checked/],
       ['zero checks', () => kit('Trusted: yes'), proof('proven-cli', { checks: '0' }), 1, /no checks ran/],
-      ['evidence outside the project', null, () => outside(dir), 1, /outside the project/],
+      ['evidence outside the project', null, () => outside(dir), 1, /evidence belongs under \.ril\/evidence\/S1\/<saved version>\//],
+      ['a product file as evidence', null, proof('proven-cli', { evidence: 'README.md' }), 1, /evidence belongs under \.ril\/evidence\/S1\/<saved version>\//],
+      ['a kit trusted only on a later line', () => writeDoc(dir, 'verification/verify.md', '# Verify\n\nTrusted: yes\n'), proof('proven-cli'), 1, /not trusted/],
       ['done with zero scenarios', null, () => withProject((empty) => ril(empty, 'stage', 'set', 'done')), 1, /no scenarios/],
       ['a decision that only mentions the scenario', null, () => {
         mutate(dir, (s) => void (s.scenarios[0].status = 'parked'));

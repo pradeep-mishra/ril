@@ -8,8 +8,10 @@ import { run } from '../lib/cli.mjs';
 import { ril } from './helpers/ril.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(.ril/**)', 'Read(.ril/**)'];
+const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)'];
+const DENY = ['Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(.ril/state.json.damaged-*)', 'Edit(.ril/.lock)', 'Edit(.ril/.lock.break)'];
 const NPM = ['Bash(npm test)', 'Bash(npm test *)', 'Bash(npm run verify)', 'Bash(npm run verify *)'];
+const INSTALL = ['Bash(npm install *)', 'Bash(npm ci)', 'Bash(npm pack *)'];
 
 // A throwaway folder with no ril project in it, so these tests also prove no project is needed.
 // Test recipes live in <dir>/recipe and <dir> is the trusted recipe root for the in-process runs below.
@@ -54,6 +56,13 @@ function recipe(dir, tools, extra = {}, name = 'recipe') {
 const tool = (name, detect, extra = {}) => ({ name, detect, install: {}, guide: `Install ${name} from its website.`, human: false, ...extra });
 const MISSING = tool('definitely-not-installed-xyz', 'definitely-not-installed-xyz --version', { install: { [process.platform]: 'echo installing' } });
 const PRESENT = tool('node', 'node --version');
+const IDENTITY_GUIDE = 'Run these two commands inside your project folder, with your own name and email (this only affects this project): git config user.name "Your Name" and git config user.email "you@example.com"';
+// An environment where git reads only the given text as its user settings (no system or home settings).
+function gitConfig(dir, text) {
+  const file = path.join(dir, 'gitconfig');
+  fs.writeFileSync(file, text);
+  return { GIT_CONFIG_GLOBAL: file, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '0' };
+}
 const settingsOf = (dir) => path.join(dir, '.claude', 'settings.json');
 const readSettings = (dir) => JSON.parse(fs.readFileSync(settingsOf(dir), 'utf8'));
 
@@ -207,14 +216,14 @@ test('a link inside the trusted folder that points outside is refused, and so is
 test('allowlist merges without removing existing entries', async () => {
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, '.claude'));
-    const mine = { model: 'opus', hooks: { Stop: [] }, permissions: { deny: ['Bash(rm *)'], allow: ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)'] } };
+    const mine = { model: 'opus', hooks: { Stop: [] }, permissions: { deny: ['Edit(.ril/.lock)', 'Bash(rm *)'], allow: ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)'] } };
     fs.writeFileSync(settingsOf(dir), JSON.stringify(mine));
     const folder = recipe(dir, [], { allowlist: { claude: ['Bash(node *)', 'Bash(git *)', 'Bash(node *)'] } });
     const r = await rilIn(dir, ['allowlist', 'write', '--recipe', folder, '--tool', 'claude']);
     assert.equal(r.code, 0, r.stderr);
     const after = readSettings(dir);
-    assert.deepEqual(after.permissions.allow, ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)', 'Bash(ril *)', 'Edit(.ril/**)', 'Read(.ril/**)', 'Bash(node *)']);
-    assert.deepEqual(after.permissions.deny, ['Bash(rm *)']);
+    assert.deepEqual(after.permissions.allow, ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)', 'Bash(ril *)', 'Edit(./**)', 'Read(./**)', 'Bash(node *)']);
+    assert.deepEqual(after.permissions.deny, ['Edit(.ril/.lock)', 'Bash(rm *)', ...DENY.filter((d) => d !== 'Edit(.ril/.lock)')], 'deny entries are added after the existing ones, never reordered or doubled');
     assert.equal(after.model, 'opus');
     assert.deepEqual(after.hooks, { Stop: [] });
     assert.match(r.stdout, /trust/i, 'the person is told to accept the trust prompt');
@@ -230,10 +239,12 @@ test('allowlist merges without removing existing entries', async () => {
 test('allowlist only treats an identical entry as a duplicate', async () => {
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, '.claude'));
-    const near = ['Bash(ril*)', 'bash(git *)', 'Bash(git  *)', 'Edit(./.ril/**)', ' Read(.ril/**)'];
-    fs.writeFileSync(settingsOf(dir), JSON.stringify({ permissions: { allow: near } }));
+    const near = ['Bash(ril*)', 'bash(git *)', 'Bash(git  *)', 'Edit(.ril/**)', ' Read(./**)'];
+    const nearDeny = ['Edit(./.ril/state.json)', 'edit(.ril/.lock)'];
+    fs.writeFileSync(settingsOf(dir), JSON.stringify({ permissions: { allow: near, deny: nearDeny } }));
     assert.equal((await rilIn(dir, ['allowlist', 'write', '--base', '--tool', 'claude'])).code, 0);
     assert.deepEqual(readSettings(dir).permissions.allow, [...near, ...BASE]);
+    assert.deepEqual(readSettings(dir).permissions.deny, [...nearDeny, ...DENY]);
   });
 });
 
@@ -241,10 +252,11 @@ test('allowlist --base writes the base entries', async () => {
   await tmp(async (dir) => {
     const r = ril(dir, 'allowlist', 'write', '--base', '--tool', 'claude');
     assert.equal(r.code, 0, r.stderr);
-    assert.deepEqual(readSettings(dir), { permissions: { allow: BASE } });
+    assert.deepEqual(readSettings(dir), { permissions: { allow: BASE, deny: DENY } });
     assert.match(r.stdout, /trust/i);
-    const json = ril(dir, '--json', 'allowlist', 'write', '--base', '--tool', 'claude');
-    assert.deepEqual(JSON.parse(json.stdout).added, []);
+    assert.equal(r.stdout.trim().split('\n').length, 1);
+    const json = JSON.parse(ril(dir, '--json', 'allowlist', 'write', '--base', '--tool', 'claude').stdout);
+    assert.deepEqual([json.added, json.denied], [[], []]);
   });
 });
 
@@ -259,7 +271,7 @@ test('allowlist --recipe adds the base entries and the recipe entries', async ()
 test('allowlist never overwrites a settings file it cannot understand', async () => {
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, '.claude'));
-    for (const text of ['{ "permissions": ', '[]', 'null', '{"permissions":[]}', '{"permissions":{"allow":"Bash(ls *)"}}']) {
+    for (const text of ['{ "permissions": ', '[]', 'null', '{"permissions":[]}', '{"permissions":{"allow":"Bash(ls *)"}}', '{"permissions":{"deny":"Edit(x)"}}', '{"permissions":{"deny":{}}}']) {
       fs.writeFileSync(settingsOf(dir), text);
       fails(dir, 1, 'allowlist', 'write', '--base', '--tool', 'claude');
       assert.equal(fs.readFileSync(settingsOf(dir), 'utf8'), text);
@@ -321,7 +333,7 @@ test('allowlist writes into the folder given by --dir', async () => {
     const project = path.join(dir, 'project');
     fs.mkdirSync(project);
     assert.equal(ril(dir, '--dir', project, 'allowlist', 'write', '--base', '--tool', 'claude').code, 0);
-    assert.deepEqual(readSettings(project).permissions.allow, BASE);
+    assert.deepEqual(readSettings(project).permissions, { allow: BASE, deny: DENY });
     assert.ok(!fs.existsSync(settingsOf(dir)));
   });
 });
@@ -332,24 +344,40 @@ test('the CLI recipe pack is complete and works with preflight and allowlist', a
   assert.equal(pack.name, 'cli');
   assert.equal(pack.type, 'cli');
   assert.deepEqual(pack.methods, { cli: 'proven-cli' });
-  assert.deepEqual(pack.requires.map((r) => r.name), ['node', 'git']);
-  const [node, git] = pack.requires;
+  assert.deepEqual(pack.requires.map((r) => r.name), ['node', 'git', 'git identity']);
+  const [node, git, identity] = pack.requires;
   assert.equal(node.detect, 'node --version');
   assert.deepEqual(node.install, { darwin: 'brew install node', win32: 'winget install OpenJS.NodeJS.LTS', linux: null });
   assert.equal(git.detect, 'git --version');
   assert.deepEqual(git.install, { darwin: 'brew install git', win32: 'winget install Git.Git', linux: null });
-  for (const r of pack.requires) assert.ok(r.guide.length > 20 && r.human === false, r.name);
-  assert.deepEqual(pack.allowlist.claude, ['Bash(node *)', ...NPM, 'Bash(git *)', 'Edit(.ril/**)']);
-  assert.ok(!pack.allowlist.claude.includes('Bash(npm *)'), 'npm install, publish and exec are not pre-approved');
+  for (const r of [node, git]) assert.ok(r.guide.length > 20 && r.human === false, r.name);
+  assert.equal(identity.detect, 'git config user.email');
+  assert.equal(identity.human, true);
+  assert.deepEqual(identity.install, { darwin: null, win32: null, linux: null });
+  assert.equal(identity.guide, IDENTITY_GUIDE);
+  assert.doesNotMatch(identity.guide, /--global/);
+  assert.deepEqual(pack.allowlist.claude, ['Bash(node *)', ...NPM, ...INSTALL, 'Bash(git *)']);
+  assert.ok(!pack.allowlist.claude.includes('Bash(npm *)'), 'npm publish and exec are not pre-approved');
 
   const guide = fs.readFileSync(path.join(folder, 'recipe.md'), 'utf8');
   assert.ok(guide.trimEnd().split('\n').length < 80, 'recipe.md stays under 80 lines');
   for (const phrase of ['.ril/evidence/<scenario>/<checkpoint>/transcript.txt', 'exit code', 'stderr', 'verify', 'zero checks', 'let the agent run the project it builds']) assert.ok(guide.includes(phrase), phrase);
 
   await tmp(async (dir) => {
-    const r = ril(dir, 'preflight', folder);
+    const root = path.join(repoRoot, 'recipes');
+    const r = await rilIn(dir, ['preflight', folder], { root, env: gitConfig(dir, '[user]\n\tname = Pat\n\temail = pat@example.com\n') });
     assert.equal(r.code, 0, r.stdout + r.stderr);
     assert.equal(ril(dir, 'allowlist', 'write', '--recipe', folder, '--tool', 'claude').code, 0);
-    assert.deepEqual(readSettings(dir).permissions.allow, [...BASE, 'Bash(node *)', ...NPM]);
+    assert.deepEqual(readSettings(dir).permissions.allow, [...BASE, 'Bash(node *)', ...NPM, ...INSTALL]);
+    assert.deepEqual(readSettings(dir).permissions.deny, DENY);
+  });
+});
+
+test('the CLI recipe reports a missing git identity with the project-local commands', async () => {
+  await tmp(async (dir) => {
+    const root = path.join(repoRoot, 'recipes');
+    const r = await rilIn(dir, ['preflight', path.join(root, 'cli')], { root, env: gitConfig(dir, '') });
+    assert.equal(r.code, 2, r.stdout + r.stderr);
+    assert.equal(r.stdout.trim(), `Missing: git identity. Only you can install this one; here is how: ${IDENTITY_GUIDE}`);
   });
 });

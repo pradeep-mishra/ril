@@ -15,10 +15,17 @@
       "install": { "darwin": "brew install git", "win32": "winget install Git.Git", "linux": null },
       "guide": "Git keeps the saved versions of the project. Download it from git-scm.com, run the installer with the default choices, then open a new terminal window and check that 'git --version' prints a number.",
       "human": false
+    },
+    {
+      "name": "git identity",
+      "detect": "git config user.email",
+      "install": { "darwin": null, "win32": null, "linux": null },
+      "guide": "Run these two commands inside your project folder, with your own name and email (this only affects this project): git config user.name \"Your Name\" and git config user.email \"you@example.com\"",
+      "human": true
     }
   ],
   "methods": { "cli": "proven-cli" },
   "allowlist": {
-    "claude": ["Bash(node *)", "Bash(npm test)", "Bash(npm test *)", "Bash(npm run verify)", "Bash(npm run verify *)", "Bash(git *)", "Edit(.ril/**)"]
+    "claude": ["Bash(node *)", "Bash(npm test)", "Bash(npm test *)", "Bash(npm run verify)", "Bash(npm run verify *)", "Bash(npm install *)", "Bash(npm ci)", "Bash(npm pack *)", "Bash(git *)"]
   }
 }

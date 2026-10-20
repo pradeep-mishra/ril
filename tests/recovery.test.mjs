@@ -10,7 +10,7 @@ import { load, mutate, readState, statePath } from '../lib/store.mjs';
 import { validate } from '../lib/schema.mjs';
 import { ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
-import { addScenario, commitFile, fails, git, head, ok, record, register, status, withRepo } from './helpers/repo.mjs';
+import { addScenario, commitFile, fails, git, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
 import { addAgent, addUnit, deadPid, killMidWrite, minutesAgo, read, stateFiles, writeReport } from './helpers/recovery.mjs';
 
 const lockFile = (dir) => path.join(dir, '.ril', '.lock');
@@ -240,6 +240,7 @@ test('orphaned doing unit returns to todo', () => {
 function proveS1(dir) {
   addScenario(dir, 'S1');
   register(dir, 'V1', 'verifier');
+  trustKit(dir);
   assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
 }
 
@@ -260,17 +261,17 @@ test('proven without evidence demoted', () => {
   });
 });
 
-test('proven with a non-trivial change after its checkpoint demoted', () => {
+test('a product change after a proof leaves the scenario proven and doctor silent', () => {
   withRepo((dir) => {
     proveS1(dir);
     commitFile(dir, 'docs/guide.md', 'words\n');
-    ok(dir, 'doctor', '--fix');
-    assert.equal(status(dir), 'proven', 'a docs change keeps the proof');
     commitFile(dir, 'src/app.js', 'code\n');
-    const fixed = reportsThenFixes(dir, 1);
-    assert.match(fixed.stdout, /src\/app\.js/);
-    assert.equal(status(dir), 'unproven');
-    settled(dir);
+    const before = stateFiles(dir);
+    const r = ok(dir, 'doctor', '--fix', '--quiet');
+    assert.equal(r.stdout + r.stderr, '');
+    assert.deepEqual(stateFiles(dir), before, 'nothing was changed');
+    assert.equal(status(dir), 'proven', 'a later saved version does not take back an earlier proof');
+    assert.match(ok(dir, 'doctor').stdout, /Nothing needed fixing/);
   });
 });
 
@@ -356,7 +357,7 @@ test('skip parks and logs', () => {
     assert.equal(unit(dir, 'U1').state, 'parked');
     assert.equal(load(dir).decisions.at(-1).decision, 'Set aside unit U1');
     assert.match(ok(dir, 'doctor').stdout, /S1/, 'doctor mentions what was set aside');
-    ok(dir, 'stage', 'set', 'done');
+    assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /Nothing has been proven yet/, 'setting everything aside does not finish the project');
   });
 });
 

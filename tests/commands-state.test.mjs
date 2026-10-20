@@ -283,11 +283,18 @@ test('rail 4: five bumps print 1 to 5, the sixth exits 4 and stores nothing', ()
     fails(dir, 4, 'round', 'bump', 'S1', '--force', 'one more');
     assert.equal(load(dir).scenarios[0].round, 5);
 
-    ok(dir, 'round', 'reset', 'S1');
+    const unforced = fails(dir, 1, 'round', 'reset', 'S1');
+    assert.match(unforced.stderr, /Next: .*ril round reset S1 --force "<reason>"/);
+    assert.equal(load(dir).scenarios[0].round, 5, 'a reset without a reason changes nothing');
+    fails(dir, 1, 'round', 'reset', 'S1', '--force', '  ');
+    ok(dir, 'round', 'reset', 'S1', '--force', 'the person chose a new approach');
     assert.equal(load(dir).scenarios[0].round, 0);
+    const logged = load(dir).decisions.at(-1);
+    assert.match(logged.decision, /S1/);
+    assert.equal(logged.why, 'the person chose a new approach');
     assert.match(ok(dir, 'round', 'bump', 'S1').stdout, /\b1\b/);
     fails(dir, 2, 'round', 'bump', 'S9');
-    fails(dir, 2, 'round', 'reset', 'S9');
+    fails(dir, 2, 'round', 'reset', 'S9', '--force', 'gone');
   }, '--cap', '5');
 });
 

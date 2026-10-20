@@ -6,8 +6,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
 import { kitTrust } from '../lib/proof.mjs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { tmpProject } from './helpers/tmp.mjs';
-import { addScenario, fails, git, gitInit, head, ok, record, register, status, withRepo } from './helpers/repo.mjs';
+import { addScenario, fails, git, gitInit, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
+
+const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ril');
 
 const toAccept = (dir) => {
   for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
@@ -23,6 +27,7 @@ test('a user setting diff.relative does not hide changes outside the project fro
     ok(dir, 'init');
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const from = ok(dir, 'checkpoint').stdout.trim();
     assert.equal(record(dir, 'S1', from, 'proven-cli').code, 0);
     fs.writeFileSync(path.join(outer, 'shared.js'), 'used by app\n');
@@ -35,37 +40,41 @@ test('a user setting diff.relative does not hide changes outside the project fro
   }
 });
 
-test('kit trust: only a plain "Trusted: yes" outside code and comments counts', () => {
+test('kit trust: only "Trusted: yes" on the first line of verify.md counts', () => {
   const p = tmpProject();
   try {
     const kit = path.join(p.dir, '.ril', 'docs', 'verification', 'verify.md');
+    assert.equal(kitTrust(p.dir), 'none', 'no kit yet');
     fs.mkdirSync(path.dirname(kit), { recursive: true });
     const trust = (text) => {
       fs.writeFileSync(kit, text);
       return kitTrust(p.dir);
     };
     const untrusted = {
+      'an empty file': '',
+      'no': 'Trusted: no\n',
       'yes/no': 'Trusted: yes/no\n',
       'yes | no': 'Trusted: yes | no\n',
       'yes or no': 'Trusted: yes or no\n',
       'yes-ish': 'Trusted: yes-ish\n',
-      'a ~~~ line does not close a ``` block': '```\n~~~\nTrusted: yes\n```\n',
-      'a ``` line does not close a ~~~ block': '~~~\n```\nTrusted: yes\n~~~\n',
-      'a shorter fence does not close a longer one': '````\n```\nTrusted: yes\n````\n',
-      'an indented code block': '# Verify\n\n    Trusted: yes\n',
-      'a tab-indented code block': '# Verify\n\n\tTrusted: yes\n',
-      'a multi-line HTML comment': '<!--\nTrusted: yes\n-->\n',
-      'a comment opened after text': 'Notes <!-- draft\nTrusted: yes\n-->\n',
+      'yesterday': 'Trusted: yesterday\n',
+      'a note after a dash': 'Trusted: yes - shown failing\n',
+      'a note after a colon': 'Trusted: yes: shown failing\n',
+      'text after the note': 'Trusted: yes (shown failing) but not really\n',
+      'bold markers': '**Trusted:** yes\n',
+      'an indent': '  Trusted: yes\n',
+      'a later line': '# Verify\n\nTrusted: yes\n',
+      'a code fence': '```\nTrusted: yes\n```\n',
+      'a comment': '<!-- Trusted: yes -->\n',
     };
     for (const [what, text] of Object.entries(untrusted)) assert.equal(trust(text), 'untrusted', what);
     const trusted = {
       'plain': 'Trusted: yes\n',
-      'a note in brackets': 'Trusted: yes (shown failing on a broken copy)\n',
-      'a note after a dash': 'Trusted: yes - shown failing\n',
-      'a note after a colon': 'Trusted: yes: shown failing\n',
-      'after a closed ~~~ block holding ```': '~~~\n```\n~~~\nTrusted: yes\n',
-      'after a closed comment': '<!-- old -->\n<!--\nTrusted: no\n-->\nTrusted: yes\n',
-      'a short indent': '  Trusted: yes\n',
+      'no line end': 'Trusted: yes',
+      'any case': 'trusted: YES\n',
+      'a note in brackets': 'Trusted: yes (shown failing on a broken copy)\n\n# Verify\n',
+      'Windows line ends': 'Trusted: yes\r\n# Verify\r\n',
+      'a byte order mark': '\uFEFFTrusted: yes\n',
     };
     for (const [what, text] of Object.entries(trusted)) assert.equal(trust(text), 'trusted', what);
   } finally {
@@ -73,10 +82,28 @@ test('kit trust: only a plain "Trusted: yes" outside code and comments counts', 
   }
 });
 
+test('a missing git identity is refused with the project-local commands, never --global', () => {
+  withRepo((dir) => {
+    git(dir, 'config', '--unset', 'user.name');
+    git(dir, 'config', '--unset', 'user.email');
+    fs.writeFileSync(path.join(dir, 'app.js'), 'code\n');
+    const empty = path.join(dir, '.ril', 'no-gitconfig');
+    fs.writeFileSync(empty, '');
+    const env = { ...process.env, GIT_CONFIG_GLOBAL: empty, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_1: 'user.useConfigOnly', GIT_CONFIG_VALUE_1: 'true' };
+    for (const key of ['GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'EMAIL']) delete env[key];
+    const r = spawnSync(process.execPath, [entry, 'checkpoint'], { cwd: dir, env, encoding: 'utf8' });
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.match(r.stderr, /^Next: .*git config user\.name "Your Name" and git config user\.email "you@example\.com"/m);
+    assert.match(r.stderr, /only affects this project/);
+    assert.doesNotMatch(r.stderr, /--global/);
+  });
+});
+
 test('done without a git repository asks for a checkpoint first', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     toAccept(dir);
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
     fs.rmSync(path.join(dir, '.git'), { recursive: true, force: true });
@@ -99,11 +126,17 @@ test('acceptance wording ignores case, but the id must match exactly', () => {
     ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Accepted as unproven: s1', '--why', 'wrong case id');
     fails(dir, 1, 'stage', 'set', 'done');
     ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'ACCEPTED AS UNPROVEN: S1', '--why', 'the sandbox is down');
+    assert.doesNotMatch(fails(dir, 1, 'stage', 'set', 'done').stderr, /S1 \(/, 'S1 now counts as accepted');
+    addScenario(dir, 'S2');
+    register(dir, 'V1', 'verifier');
+    trustKit(dir);
+    assert.equal(record(dir, 'S2', head(dir), 'proven-cli').code, 0);
     ok(dir, 'stage', 'set', 'done');
   });
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'Accepted risk for s1: slow', '--why', 'wrong case id');
     assert.equal(record(dir, 'S1', head(dir), 'proven-cli', { review: 'risks' }).code, 1);
     ok(dir, 'decision', 'log', '--stage', 'shape', '--decision', 'accepted RISK for S1: slow', '--why', 'agreed');
@@ -115,6 +148,7 @@ test('blocked never replaces a failed result at the same saved version', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
+    trustKit(dir);
     const now = head(dir);
     assert.equal(record(dir, 'S1', now, 'failed', { review: 'none' }).code, 0);
     const blocked = record(dir, 'S1', now, 'blocked', { review: 'none' });

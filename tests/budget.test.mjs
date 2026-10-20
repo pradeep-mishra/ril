@@ -139,6 +139,13 @@ test('file size', (t) => report(t, checkFileSize(repoRoot)));
 test('principles size', (t) => report(t, checkDocSizes(repoRoot)));
 test('no dependencies', (t) => report(t, checkDependencies(repoRoot)));
 
+test('line ends are LF everywhere except the CRLF fixture, and Node 20.10 or later is required', () => {
+  const attributes = fs.readFileSync(path.join(repoRoot, '.gitattributes'), 'utf8').split(/\r?\n/);
+  assert.equal(attributes[0], '* text=auto eol=lf');
+  assert.ok(attributes.includes('tests/fixtures/spec-crlf.md -text'), 'the CRLF fixture keeps its bytes');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).engines.node, '>=20.10');
+});
+
 test('checks can fail: extensionless bin file over 300 lines', () => {
   withTempRepo((dir) => {
     write(dir, 'bin/ril', lines(301));

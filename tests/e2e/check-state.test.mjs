@@ -127,6 +127,17 @@ const variants = [
   ['the kit says Trusted: yes/no', TRUST('Trusted: yes/no'), /Trusted: yes/],
   ['the kit says Trusted: yesterday', TRUST('Trusted: yesterday'), /Trusted: yes/],
   ['the kit line sits inside a code fence', TRUST('```\nTrusted: yes\n```'), /Trusted: yes/],
+  ['the kit says Trusted: yes only on a later line', TRUST('Trusted: yes'), /Trusted: yes/],
+  ['the kit is missing', (dir) => {
+    fs.rmSync(docs(dir, 'verification', 'verify.md'));
+    resave(dir);
+  }, /Trusted: yes/],
+  ['every scenario is set aside and none is proven', (dir) => edit(dir, (s) => {
+    for (const sc of s.scenarios) {
+      sc.status = 'parked';
+      s.decisions.push({ ts: new Date().toISOString(), stage: 'accept', decision: `Accepted as unproven: ${sc.id}`, why: 'stuck' });
+    }
+  }), /No scenario is proven/],
   ['an agent is still working', (dir) => edit(dir, (s) => void (s.agents[0].state = 'running')), /still marked as working/],
   ['the verifier is not a verifier', (dir) => edit(dir, (s) => void (s.agents[0].role = 'implementer')), /not a verifier/],
   ['a proof ran zero checks', (dir) => edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').checks = 0)), /ran 0 checks/],
@@ -139,7 +150,8 @@ const variants = [
   ['the evidence path is outside the project', (dir) => {
     const file = outsideFile();
     edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').evidence = file));
-  }, /evidence for scenario S1.*outside the project/],
+  }, /evidence for scenario S1.*outside \.ril\/evidence/],
+  ['the evidence is a product file', (dir) => edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').evidence = 'README.md')), /evidence for scenario S1.*outside \.ril\/evidence/],
   ['the final report is missing', (dir) => {
     fs.rmSync(docs(dir, 'reports', 'final.md'));
     resave(dir);
@@ -174,5 +186,5 @@ test('checker fails when the evidence is a link to a file outside the project', 
   if (!linked) return t.skip('this system does not let the test create links');
   assert.equal(r.code, 1, r.text);
   assert.ok(r.problems.length >= 1, r.text);
-  for (const line of r.problems) assert.match(line, /evidence for scenario S1.*outside the project/);
+  for (const line of r.problems) assert.match(line, /evidence for scenario S1.*outside \.ril\/evidence/);
 });

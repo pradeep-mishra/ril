@@ -1,1 +1,3 @@
+* text=auto eol=lf
 tests/fixtures/spec-crlf.md -text
+bin/ril.cmd -text
