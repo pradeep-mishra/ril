@@ -6,6 +6,7 @@ unit tests is not proof.
 
 ## What you need
 - Node.js and git (`ril preflight recipes/cli` checks both).
+- The permissions in `recipe.json` (node, git, `npm test` and `npm run verify`) let the agent run the project it builds.
 - The scenario: its id, its criterion (the sentence that must be true) and the checkpoint (the saved
   version of the code you are proving).
 
