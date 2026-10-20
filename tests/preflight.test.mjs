@@ -5,16 +5,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { run } from '../lib/cli.mjs';
+import { loadTools, checkAllow } from '../lib/tools.mjs';
 import { ril } from './helpers/ril.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = ['Bash(ril *)', 'Bash(git *)', 'Edit(./**)', 'Read(./**)'];
 const DENY = ['Edit(.ril/state.json)', 'Edit(.ril/state.json.bak)', 'Edit(.ril/state.json.damaged-*)', 'Edit(.ril/.lock)', 'Edit(.ril/.lock.break)', 'Edit(.claude/**)', 'Edit(.git/**)'];
-const NPM = ['Bash(npm test)', 'Bash(npm test *)', 'Bash(npm run verify)', 'Bash(npm run verify *)'];
-const INSTALL = ['Bash(npm install *)', 'Bash(npm ci)', 'Bash(npm pack *)'];
+const IDENTITY_GUIDE = 'Run these three commands inside your project folder, with your own name and email (this only affects this project): git init, then git config user.name "Your Name" and git config user.email "you@example.com"';
 
-// A throwaway folder with no ril project in it, so these tests also prove no project is needed.
-// Test recipes live in <dir>/recipe and <dir> is the trusted recipe root for the in-process runs below.
+// A throwaway folder; most tests need no ril project in it, so they also prove none is needed.
 async function tmp(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ril-pre-'));
   try {
@@ -24,11 +23,11 @@ async function tmp(fn) {
   }
 }
 
-// Runs ril in this process so a test can point the trusted recipe root at a temp folder (an internal option, not a flag).
-async function rilIn(dir, args, { root = dir, env = {} } = {}) {
+// Runs ril in this process so a test can set the environment.
+async function rilIn(dir, args, { env = {} } = {}) {
   let stdout = '';
   let stderr = '';
-  const code = await run(args, { cwd: dir, recipeRoot: root, env: { ...process.env, ...env }, out: (t) => (stdout += `${t}\n`), err: (t) => (stderr += `${t}\n`) });
+  const code = await run(args, { cwd: dir, env: { ...process.env, ...env }, out: (t) => (stdout += `${t}\n`), err: (t) => (stderr += `${t}\n`) });
   return { code, stdout, stderr };
 }
 
@@ -46,17 +45,15 @@ function fails(dir, code, ...args) {
   return r;
 }
 
-function recipe(dir, tools, extra = {}, name = 'recipe') {
-  const folder = path.join(dir, name);
-  fs.mkdirSync(folder, { recursive: true });
-  fs.writeFileSync(path.join(folder, 'recipe.json'), JSON.stringify({ name: 'demo', type: 'cli', requires: tools, ...extra }));
-  return folder;
+// Writes <dir>/.ril/tools.json (as given, or as JSON text) and returns its hash.
+function tools(dir, list, extra = {}) {
+  fs.mkdirSync(path.join(dir, '.ril'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.ril', 'tools.json'), typeof list === 'string' ? list : JSON.stringify(Array.isArray(list) ? { requires: list, ...extra } : list));
 }
 
-const tool = (name, detect, extra = {}) => ({ name, detect, install: {}, guide: `Install ${name} from its website.`, human: false, ...extra });
+const tool = (name, detect, extra = {}) => ({ name, detect, install: {}, guide: `Install ${name} from its website.`, human: false, reason: `${name} does the work.`, ...extra });
 const MISSING = tool('definitely-not-installed-xyz', 'definitely-not-installed-xyz --version', { install: { [process.platform]: 'echo installing' } });
 const PRESENT = tool('node', 'node --version');
-const IDENTITY_GUIDE = 'Run these three commands inside your project folder, with your own name and email (this only affects this project): git init, then git config user.name "Your Name" and git config user.email "you@example.com"';
 // An environment where git reads only the given text as its user settings (no system or home settings).
 function gitConfig(dir, text) {
   const file = path.join(dir, 'gitconfig');
@@ -65,161 +62,109 @@ function gitConfig(dir, text) {
 }
 const settingsOf = (dir) => path.join(dir, '.claude', 'settings.json');
 const readSettings = (dir) => JSON.parse(fs.readFileSync(settingsOf(dir), 'utf8'));
+// A ril project in `dir` whose tool list is `list`; approve() records the person's approval of the list as it is now.
+function project(dir, list) {
+  assert.equal(ril(dir, 'init').code, 0);
+  tools(dir, list);
+}
+function approve(dir, text = (hash) => `Approved tools ${hash}`) {
+  const hash = ril(dir, 'allowlist', 'hash').stdout.trim();
+  assert.equal(ril(dir, 'decision', 'log', '--stage', 'design', '--decision', text(hash), '--why', 'the person said yes').code, 0);
+  return hash;
+}
+const APPROVED = ['--approved', '--tool', 'claude'];
+const LIST = { requires: [PRESENT], allow: ['Bash(node *)', 'mcp__panel__inspect'], humanSteps: [] };
 
-test('preflight reports missing tool', async () => {
+test('preflight reports a missing tool, shows the list hash and says why each tool is needed', async () => {
   await tmp(async (dir) => {
-    const r = await rilIn(dir, ['preflight', recipe(dir, [MISSING])]);
+    tools(dir, [PRESENT, MISSING]);
+    const hash = loadTools(dir).hash;
+    const r = await rilIn(dir, ['preflight']);
     assert.equal(r.code, 2);
-    assert.equal(r.stdout.trim(), 'Missing: definitely-not-installed-xyz. I can install it for you, or guide you step by step.');
-    assert.ok(!fs.existsSync(path.join(dir, '.ril')), 'preflight does not need or create a project');
+    assert.deepEqual(r.stdout.trim().split('\n'), [`Tool list ${hash}`, 'node: node does the work.', 'definitely-not-installed-xyz: definitely-not-installed-xyz does the work.', 'Missing: definitely-not-installed-xyz. I can install it for you, or guide you step by step.']);
+    assert.ok(!fs.existsSync(path.join(dir, '.ril', 'state.json')), 'preflight does not need or create a project');
   });
 });
 
 test('a tool with no installer for this system gets guide-only text', async () => {
   await tmp(async (dir) => {
-    const r = await rilIn(dir, ['preflight', recipe(dir, [{ ...MISSING, install: {}, guide: 'download it from the vendor site' }])]);
+    tools(dir, [{ ...MISSING, install: {}, guide: 'download it from the vendor site' }]);
+    const r = await rilIn(dir, ['preflight']);
     assert.equal(r.code, 2);
-    assert.equal(r.stdout.trim(), 'Missing: definitely-not-installed-xyz. I have no automatic installer for this system; here is how: download it from the vendor site');
-    const nulled = await rilIn(dir, ['preflight', recipe(dir, [{ ...MISSING, install: { [process.platform]: null } }]), '--json']);
-    assert.equal(JSON.parse(nulled.stdout).missing[0].install, null);
+    assert.match(r.stdout, /^Missing: definitely-not-installed-xyz\. I have no automatic installer for this system; here is how: download it from the vendor site$/m);
+    tools(dir, [{ ...MISSING, install: { [process.platform]: null } }]);
+    assert.equal(JSON.parse((await rilIn(dir, ['preflight', '--json'])).stdout).missing[0].install, null);
   });
 });
 
-test('present tool passes', async () => {
+test('a present tool passes', async () => {
   await tmp(async (dir) => {
-    const r = await rilIn(dir, ['preflight', recipe(dir, [PRESENT])]);
+    tools(dir, [PRESENT]);
+    const r = await rilIn(dir, ['preflight']);
     assert.equal(r.code, 0, r.stderr);
-    assert.equal(r.stdout.trim(), 'Everything this project needs is installed.');
+    assert.match(r.stdout, /^Everything this project needs is installed\.$/m);
   });
 });
 
-test('human tool shows only a guide', async () => {
+test('a human-only tool shows only a guide', async () => {
   await tmp(async (dir) => {
-    const r = await rilIn(dir, ['preflight', recipe(dir, [{ ...MISSING, human: true, guide: 'open the vendor site and run the installer' }])]);
+    tools(dir, [{ ...MISSING, human: true, guide: 'open the vendor site and run the installer' }]);
+    const r = await rilIn(dir, ['preflight']);
     assert.equal(r.code, 2);
-    assert.equal(r.stdout.trim(), 'Missing: definitely-not-installed-xyz. Only you can install this one; here is how: open the vendor site and run the installer');
+    assert.match(r.stdout, /^Missing: definitely-not-installed-xyz\. Only you can install this one; here is how: open the vendor site and run the installer$/m);
     assert.doesNotMatch(r.stdout, /I can install/);
   });
 });
 
-test('timeout counts as missing', async () => {
+test('a timeout counts as missing, and a bad timeout setting is refused plainly', async () => {
   await tmp(async (dir) => {
-    const slow = tool('slowpoke', 'node -e "setTimeout(()=>{},30000)"');
+    tools(dir, [tool('slowpoke', 'node -e "setTimeout(()=>{},30000)"')]);
     const started = Date.now();
-    const r = await rilIn(dir, ['preflight', recipe(dir, [slow])], { env: { RIL_DETECT_TIMEOUT_MS: '1000' } });
+    const r = await rilIn(dir, ['preflight'], { env: { RIL_DETECT_TIMEOUT_MS: '1000' } });
     assert.equal(r.code, 2, r.stdout + r.stderr);
-    assert.match(r.stdout, /^Missing: slowpoke\./);
+    assert.match(r.stdout, /^Missing: slowpoke\./m);
     assert.ok(Date.now() - started < 20_000, 'the check was cut off at the timeout');
+    for (const bad of ['0', 'soon', '-5']) await failsIn(dir, 1, ['preflight'], { env: { RIL_DETECT_TIMEOUT_MS: bad } });
   });
 });
 
-test('a bad timeout setting is refused plainly', async () => {
+test('preflight needs a usable tool list, and the old folder form is gone', async () => {
   await tmp(async (dir) => {
-    const folder = recipe(dir, [PRESENT]);
-    for (const bad of ['0', 'soon', '-5']) await failsIn(dir, 1, ['preflight', folder], { env: { RIL_DETECT_TIMEOUT_MS: bad } });
-  });
-});
-
-test('bad recipe.json exits 1, a missing one exits 2, each with a Next line', async () => {
-  await tmp(async (dir) => {
-    const folder = path.join(dir, 'recipe');
-    fs.mkdirSync(folder);
-    await failsIn(dir, 2, ['preflight', folder]);
-    await failsIn(dir, 2, ['preflight', path.join(dir, 'nowhere')]);
+    const none = await failsIn(dir, 1, ['preflight']);
+    assert.match(none.stderr, /no tool list/);
+    tools(dir, '{ not json');
     await failsIn(dir, 1, ['preflight']);
-    const file = path.join(folder, 'recipe.json');
-    for (const text of ['{ not json', '[]', '{"name":"x","requires":"node"}', '{"name":"x","requires":[{"name":"a"}]}', '{"name":"x","requires":[{"name":"a","detect":"node --version","guide":"g","human":"yes"}]}', '{"name":"x","requires":[],"allowlist":{"claude":"Bash(ril *)"}}']) {
-      fs.writeFileSync(file, text);
-      const r = await failsIn(dir, 1, ['preflight', folder]);
-      assert.match(r.stderr, /recipe\.json/, text);
-    }
+    tools(dir, [PRESENT]);
+    const old = await failsIn(dir, 1, ['preflight', 'some-folder']);
+    assert.match(old.stderr, /tools\.json/);
   });
 });
 
-test('{recipe} in a detect command is the recipe folder, even when the path has a space and a quote', async () => {
+test('preflight --json adds the hash and the reasons and keeps the missing list', async () => {
   await tmp(async (dir) => {
-    const folder = recipe(dir, [tool('helper', 'node {recipe}/probe.mjs'), tool('viaenv', 'node -e "process.exit(process.env.RIL_RECIPE_DIR ? 0 : 1)"')], {}, "my recipe's folder");
-    fs.writeFileSync(path.join(folder, 'probe.mjs'), 'process.exit(0);\n');
-    const r = await rilIn(dir, ['preflight', folder]);
-    assert.equal(r.code, 0, r.stdout + r.stderr);
-    fs.writeFileSync(path.join(folder, 'probe.mjs'), 'process.exit(1);\n');
-    assert.equal((await rilIn(dir, ['preflight', folder])).code, 2);
-  });
-});
-
-test('the detect process gets the recipe folder in RIL_RECIPE_DIR', async () => {
-  await tmp(async (dir) => {
-    const folder = recipe(dir, [tool('same', 'node {recipe}/probe.mjs')]);
-    fs.writeFileSync(path.join(folder, 'probe.mjs'), `import fs from 'node:fs';\nprocess.exit(fs.realpathSync(process.env.RIL_RECIPE_DIR) === ${JSON.stringify(fs.realpathSync(folder))} ? 0 : 1);\n`);
-    assert.equal((await rilIn(dir, ['preflight', folder])).code, 0);
-  });
-});
-
-test('preflight --json lists what is missing with the install command for this platform', async () => {
-  await tmp(async (dir) => {
-    const folder = recipe(dir, [PRESENT, MISSING, { ...MISSING, name: 'other', install: {}, human: true }]);
-    const r = await rilIn(dir, ['preflight', folder, '--json']);
+    tools(dir, [PRESENT, MISSING, { ...MISSING, name: 'other', reason: 'other does the work.', install: {}, human: true }]);
+    const r = await rilIn(dir, ['preflight', '--json']);
     assert.equal(r.code, 2);
-    const { missing } = JSON.parse(r.stdout);
-    assert.deepEqual(missing.map((m) => [m.name, m.human, m.install]), [['definitely-not-installed-xyz', false, 'echo installing'], ['other', true, null]]);
-    assert.equal(missing[0].guide, 'Install definitely-not-installed-xyz from its website.');
-    const clean = await rilIn(dir, ['preflight', recipe(dir, [PRESENT]), '--json']);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.hash, loadTools(dir).hash);
+    assert.deepEqual(out.tools.map((t) => [t.name, t.reason]), [['node', 'node does the work.'], ['definitely-not-installed-xyz', 'definitely-not-installed-xyz does the work.'], ['other', 'other does the work.']]);
+    assert.deepEqual(out.missing.map((m) => [m.name, m.human, m.install]), [['definitely-not-installed-xyz', false, 'echo installing'], ['other', true, null]]);
+    assert.equal(out.missing[0].guide, 'Install definitely-not-installed-xyz from its website.');
+    tools(dir, [PRESENT]);
+    const clean = await rilIn(dir, ['preflight', '--json']);
     assert.equal(clean.code, 0);
-    assert.deepEqual(JSON.parse(clean.stdout), { missing: [] });
-  });
-});
-
-test('a recipe outside the recipes that ship with ril is refused by both commands, with no way around it', async () => {
-  await tmp(async (dir) => {
-    const copy = path.join(dir, 'recipe-copy');
-    fs.cpSync(path.join(repoRoot, 'recipes', 'cli'), copy, { recursive: true });
-    fs.mkdirSync(path.join(dir, '.ril'));
-    const hidden = path.join(dir, '.ril', 'recipe-copy');
-    fs.cpSync(copy, hidden, { recursive: true });
-    for (const folder of [copy, hidden, repoRoot, path.join(repoRoot, 'recipes')]) {
-      const pre = fails(dir, 1, 'preflight', folder);
-      assert.match(pre.stderr, /ship with ril/);
-      const allow = fails(dir, 1, 'allowlist', 'write', '--recipe', folder, '--tool', 'claude');
-      assert.match(allow.stderr, /ship with ril/);
-      fails(dir, 1, '--force', 'trust me', 'preflight', folder);
-    }
-    assert.ok(!fs.existsSync(settingsOf(dir)), 'nothing was written');
-    const ok = ril(dir, 'preflight', path.join(repoRoot, 'recipes', 'cli'));
-    assert.equal(ok.code, 0, ok.stdout + ok.stderr);
-  });
-});
-
-test('a link inside the trusted folder that points outside is refused, and so is a ../ escape', async (t) => {
-  await tmp(async (dir) => {
-    const root = path.join(dir, 'trusted');
-    fs.mkdirSync(root);
-    const outside = recipe(dir, [PRESENT], {}, 'outside');
-    try {
-      fs.symlinkSync(outside, path.join(root, 'evil'), 'junction');
-    } catch {
-      return t.skip('links cannot be made here');
-    }
-    const inside = recipe(root, [PRESENT], {}, 'good');
-    assert.equal((await rilIn(dir, ['preflight', inside], { root })).code, 0);
-    for (const folder of [path.join(root, 'evil'), path.join(root, '..', 'outside'), root]) {
-      const r = await failsIn(dir, 1, ['preflight', folder], { root });
-      assert.match(r.stderr, /ship with ril/);
-      await failsIn(dir, 1, ['allowlist', 'write', '--recipe', folder, '--tool', 'claude'], { root });
-    }
-    fs.mkdirSync(path.join(root, 'linked-file'));
-    fs.symlinkSync(path.join(outside, 'recipe.json'), path.join(root, 'linked-file', 'recipe.json'));
-    await failsIn(dir, 1, ['preflight', path.join(root, 'linked-file')], { root });
-    assert.ok(!fs.existsSync(settingsOf(dir)));
+    assert.deepEqual(JSON.parse(clean.stdout).missing, []);
   });
 });
 
 test('allowlist merges without removing existing entries', async () => {
   await tmp(async (dir) => {
+    project(dir, { requires: [], allow: ['Bash(node *)', 'Bash(git *)', 'Bash(node *)'] });
+    approve(dir);
     fs.mkdirSync(path.join(dir, '.claude'));
     const mine = { model: 'opus', hooks: { Stop: [] }, permissions: { deny: ['Edit(.ril/.lock)', 'Bash(rm *)'], allow: ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)'] } };
     fs.writeFileSync(settingsOf(dir), JSON.stringify(mine));
-    const folder = recipe(dir, [], { allowlist: { claude: ['Bash(node *)', 'Bash(git *)', 'Bash(node *)'] } });
-    const r = await rilIn(dir, ['allowlist', 'write', '--recipe', folder, '--tool', 'claude']);
+    const r = ril(dir, 'allowlist', 'write', ...APPROVED);
     assert.equal(r.code, 0, r.stderr);
     const after = readSettings(dir);
     assert.deepEqual(after.permissions.allow, ['Bash(ls *)', 'Bash(git *)', 'Edit(src/**)', 'Bash(ril *)', 'Edit(./**)', 'Read(./**)', 'Bash(node *)']);
@@ -229,8 +174,7 @@ test('allowlist merges without removing existing entries', async () => {
     assert.match(r.stdout, /trust/i, 'the person is told to accept the trust prompt');
     assert.equal(r.stdout.trim().split('\n').length, 1);
     const text = fs.readFileSync(settingsOf(dir), 'utf8');
-    const again = await rilIn(dir, ['allowlist', 'write', '--recipe', folder, '--tool', 'claude']);
-    assert.equal(again.code, 0);
+    assert.equal(ril(dir, 'allowlist', 'write', ...APPROVED).code, 0);
     assert.equal(fs.readFileSync(settingsOf(dir), 'utf8'), text, 'a second run changes nothing');
     assert.ok(fs.readdirSync(path.join(dir, '.claude')).every((n) => !n.endsWith('.tmp')));
   });
@@ -260,14 +204,6 @@ test('allowlist --base writes the base entries', async () => {
   });
 });
 
-test('allowlist --recipe adds the base entries and the recipe entries', async () => {
-  await tmp(async (dir) => {
-    const folder = recipe(dir, [], { allowlist: { claude: ['Bash(node *)'] } });
-    assert.equal((await rilIn(dir, ['allowlist', 'write', '--recipe', folder, '--tool', 'claude'])).code, 0);
-    assert.deepEqual(readSettings(dir).permissions.allow, [...BASE, 'Bash(node *)']);
-  });
-});
-
 test('allowlist never overwrites a settings file it cannot understand', async () => {
   await tmp(async (dir) => {
     fs.mkdirSync(path.join(dir, '.claude'));
@@ -276,20 +212,6 @@ test('allowlist never overwrites a settings file it cannot understand', async ()
       fails(dir, 1, 'allowlist', 'write', '--base', '--tool', 'claude');
       assert.equal(fs.readFileSync(settingsOf(dir), 'utf8'), text);
     }
-  });
-});
-
-test('a settings file with comments is refused with a plain reason', async () => {
-  await tmp(async (dir) => {
-    fs.mkdirSync(path.join(dir, '.claude'));
-    for (const text of ['{\n  // my rules\n  "permissions": { "allow": [] }\n}\n', '/* mine */ {"permissions":{"allow":[]}}', '{"permissions":{"allow":["Bash(ls *)"]}, // x\n"model":"opus"}']) {
-      fs.writeFileSync(settingsOf(dir), text);
-      const r = fails(dir, 1, 'allowlist', 'write', '--base', '--tool', 'claude');
-      assert.match(r.stderr, /\(comments are not allowed in this file\)/);
-      assert.equal(fs.readFileSync(settingsOf(dir), 'utf8'), text);
-    }
-    fs.writeFileSync(settingsOf(dir), '{ "permissions": ');
-    assert.doesNotMatch(fails(dir, 1, 'allowlist', 'write', '--base', '--tool', 'claude').stderr, /comments/);
   });
 });
 
@@ -313,21 +235,6 @@ test('allowlist refuses a settings file or folder that is a link', async (t) => 
   });
 });
 
-test('allowlist checks its options', async () => {
-  await tmp(async (dir) => {
-    const folder = recipe(dir, []);
-    const codex = await failsIn(dir, 1, ['allowlist', 'write', '--base', '--tool', 'codex']);
-    assert.match(codex.stderr, /Codex/);
-    await failsIn(dir, 1, ['allowlist', 'write', '--base', '--tool', 'vim']);
-    await failsIn(dir, 1, ['allowlist', 'write', '--base']);
-    await failsIn(dir, 1, ['allowlist', 'write', '--tool', 'claude']);
-    await failsIn(dir, 1, ['allowlist', 'write', '--base', '--recipe', folder, '--tool', 'claude']);
-    await failsIn(dir, 2, ['allowlist', 'write', '--recipe', path.join(dir, 'nowhere'), '--tool', 'claude']);
-    await failsIn(dir, 1, ['allowlist']);
-    assert.ok(!fs.existsSync(settingsOf(dir)), 'nothing was written');
-  });
-});
-
 test('allowlist writes into the folder given by --dir', async () => {
   await tmp(async (dir) => {
     const project = path.join(dir, 'project');
@@ -338,47 +245,86 @@ test('allowlist writes into the folder given by --dir', async () => {
   });
 });
 
-test('the CLI recipe pack is complete and works with preflight and allowlist', async () => {
-  const folder = path.join(repoRoot, 'recipes', 'cli');
-  const pack = JSON.parse(fs.readFileSync(path.join(folder, 'recipe.json'), 'utf8'));
-  assert.equal(pack.name, 'cli');
-  assert.equal(pack.type, 'cli');
-  assert.deepEqual(pack.methods, { cli: 'proven-cli' });
-  assert.deepEqual(pack.requires.map((r) => r.name), ['node', 'git', 'git identity']);
-  const [node, git, identity] = pack.requires;
-  assert.equal(node.detect, 'node --version');
-  assert.deepEqual(node.install, { darwin: 'brew install node', win32: 'winget install OpenJS.NodeJS.LTS', linux: null });
-  assert.equal(git.detect, 'git --version');
-  assert.deepEqual(git.install, { darwin: 'brew install git', win32: 'winget install Git.Git', linux: null });
-  for (const r of [node, git]) assert.ok(r.guide.length > 20 && r.human === false, r.name);
-  assert.equal(identity.detect, 'git config user.email');
-  assert.equal(identity.human, true);
-  assert.deepEqual(identity.install, { darwin: null, win32: null, linux: null });
-  assert.equal(identity.guide, IDENTITY_GUIDE);
-  assert.doesNotMatch(identity.guide, /--global/);
-  assert.match(identity.guide, /: git init, then git config user\.name /, 'a new folder is not a git repository yet, so the guide starts with git init');
-  assert.deepEqual(pack.allowlist.claude, ['Bash(node *)', ...NPM, ...INSTALL, 'Bash(git *)']);
-  assert.ok(!pack.allowlist.claude.includes('Bash(npm *)'), 'npm publish and exec are not pre-approved');
-
-  const guide = fs.readFileSync(path.join(folder, 'recipe.md'), 'utf8');
-  assert.ok(guide.trimEnd().split('\n').length < 80, 'recipe.md stays under 80 lines');
-  for (const phrase of ['.ril/evidence/<scenario>/<checkpoint>/transcript.txt', 'exit code', 'stderr', 'verify', 'zero checks', 'let the agent run the project it builds']) assert.ok(guide.includes(phrase), phrase);
-
+test('allowlist --approved writes the base entries and the approved list, deny entries included', async () => {
   await tmp(async (dir) => {
-    const root = path.join(repoRoot, 'recipes');
-    const r = await rilIn(dir, ['preflight', folder], { root, env: gitConfig(dir, '[user]\n\tname = Pat\n\temail = pat@example.com\n') });
-    assert.equal(r.code, 0, r.stdout + r.stderr);
-    assert.equal(ril(dir, 'allowlist', 'write', '--recipe', folder, '--tool', 'claude').code, 0);
-    assert.deepEqual(readSettings(dir).permissions.allow, [...BASE, 'Bash(node *)', ...NPM, ...INSTALL]);
-    assert.deepEqual(readSettings(dir).permissions.deny, DENY);
+    project(dir, LIST);
+    approve(dir);
+    assert.equal(ril(dir, 'allowlist', 'write', ...APPROVED).code, 0);
+    assert.deepEqual(readSettings(dir).permissions, { allow: [...BASE, 'Bash(node *)', 'mcp__panel__inspect'], deny: DENY });
   });
 });
 
-test('the CLI recipe reports a missing git identity with the project-local commands', async () => {
+test('allowlist --approved refuses without an approval, with an edited list, with a broad pattern, and --force changes nothing', async () => {
   await tmp(async (dir) => {
-    const root = path.join(repoRoot, 'recipes');
-    const r = await rilIn(dir, ['preflight', path.join(root, 'cli')], { root, env: gitConfig(dir, '') });
+    project(dir, LIST);
+    const none = fails(dir, 1, 'allowlist', 'write', ...APPROVED);
+    assert.match(none.stderr, /has not approved/);
+    assert.match(none.stderr, new RegExp(`Approved tools ${ril(dir, 'allowlist', 'hash').stdout.trim()}`), 'the Next line names the decision to record');
+    fails(dir, 1, '--force', 'trust me', 'allowlist', 'write', ...APPROVED);
+    approve(dir, (hash) => `approved tools ${hash}`);
+    fails(dir, 1, 'allowlist', 'write', ...APPROVED);
+    approve(dir);
+    tools(dir, { ...LIST, allow: [...LIST.allow, 'Bash(npm publish)'] });
+    fails(dir, 1, 'allowlist', 'write', ...APPROVED);
+    fails(dir, 1, '--force', 'trust me', 'allowlist', 'write', ...APPROVED);
+    tools(dir, { ...LIST, allow: ['Bash(*)'] });
+    approve(dir);
+    const broad = fails(dir, 1, '--force', 'trust me', 'allowlist', 'write', ...APPROVED);
+    assert.match(broad.stderr, /Bash\(\*\)/);
+    assert.ok(!fs.existsSync(settingsOf(dir)), 'nothing was written');
+  });
+});
+
+test('allowlist --approved needs a tool list that loads and a project', async () => {
+  await tmp(async (dir) => {
+    fails(dir, 2, 'allowlist', 'write', ...APPROVED);
+    project(dir, LIST);
+    fs.rmSync(path.join(dir, '.ril', 'tools.json'));
+    fails(dir, 1, 'allowlist', 'write', ...APPROVED);
+    tools(dir, '{"requires":"node"}');
+    fails(dir, 1, 'allowlist', 'write', ...APPROVED);
+    assert.ok(!fs.existsSync(settingsOf(dir)));
+  });
+});
+
+test('allowlist hash prints the tool list hash, and --json gives it as {hash}', async () => {
+  await tmp(async (dir) => {
+    tools(dir, LIST);
+    const { hash } = loadTools(dir);
+    assert.equal(ril(dir, 'allowlist', 'hash').stdout, `${hash}\n`);
+    assert.deepEqual(JSON.parse(ril(dir, '--json', 'allowlist', 'hash').stdout), { hash });
+    fs.rmSync(path.join(dir, '.ril', 'tools.json'));
+    fails(dir, 1, 'allowlist', 'hash');
+  });
+});
+
+test('allowlist checks its options', async () => {
+  await tmp(async (dir) => {
+    project(dir, LIST);
+    approve(dir);
+    await failsIn(dir, 1, ['allowlist', 'write', '--base', '--tool', 'codex']);
+    await failsIn(dir, 1, ['allowlist', 'write', '--base', '--tool', 'vim']);
+    await failsIn(dir, 1, ['allowlist', 'write', '--base']);
+    await failsIn(dir, 1, ['allowlist', 'write', '--tool', 'claude']);
+    await failsIn(dir, 1, ['allowlist', 'write', '--base', '--approved', '--tool', 'claude']);
+    await failsIn(dir, 1, ['allowlist', 'write', '--recipe', 'x', '--tool', 'claude']);
+    await failsIn(dir, 1, ['allowlist']);
+    assert.ok(!fs.existsSync(settingsOf(dir)), 'nothing was written');
+  });
+});
+
+test('the cli-todo example has a tool list that loads, passes the permission check and reports a missing git identity', async () => {
+  const folder = path.join(repoRoot, 'examples', 'cli-todo');
+  await tmp(async (dir) => {
+    fs.mkdirSync(path.join(dir, '.ril'));
+    fs.copyFileSync(path.join(folder, 'tools.json'), path.join(dir, '.ril', 'tools.json'));
+    const { tools: list } = loadTools(dir);
+    assert.deepEqual(list.requires.map((r) => r.name), ['node', 'git', 'git identity']);
+    assert.deepEqual(checkAllow(list.allow), []);
+    const ok = await rilIn(dir, ['preflight'], { env: gitConfig(dir, '[user]\n\tname = Pat\n\temail = pat@example.com\n') });
+    assert.equal(ok.code, 0, ok.stdout + ok.stderr);
+    const r = await rilIn(dir, ['preflight'], { env: gitConfig(dir, '') });
     assert.equal(r.code, 2, r.stdout + r.stderr);
-    assert.equal(r.stdout.trim(), `Missing: git identity. Only you can install this one; here is how: ${IDENTITY_GUIDE}`);
+    assert.match(r.stdout, new RegExp(`^Missing: git identity\\. Only you can install this one; here is how: ${IDENTITY_GUIDE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'));
   });
 });

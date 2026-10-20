@@ -40,7 +40,7 @@ a real run, and the failure is named in the Run log below.
 | Size limits: 8 skills, 120 lines per skill, 6 roles, 20 command groups, 300 lines per source file, no runtime dependencies | Test: `tests/budget.test.mjs` |
 | Every `ril` command a skill or role names exists | Test: `tests/skills.test.mjs` |
 | No shipped file names another plugin | Test: `tests/skills.test.mjs` for skills, roles and direction files. For docs and `tests/e2e` it is an author and reviewer restriction, not a test |
-| Only the recipes that ship with RIL are trusted: preflight and allowlist refuse any other folder | CLI: `ril preflight`, `ril allowlist`. Test: `tests/preflight.test.mjs` |
+| The project's tool list (`.ril/tools.json`) is approved once, by hash: `ril allowlist write --approved` grants its permissions only when the last `Approved tools <sha256>` decision matches the file and no pattern is broad or outside the project; `--force` does not bypass | CLI: `ril allowlist`. Tests: `tests/preflight.test.mjs`, `tests/tools.test.mjs` |
 | Risky or irreversible actions are never done silently | Skill instruction only (standing rule 7), plus the host's own permission prompts |
 
 ## Known limits

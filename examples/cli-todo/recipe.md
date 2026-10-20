@@ -5,8 +5,8 @@ program the way a person would and keeping what actually happened. Reading the c
 unit tests is not proof.
 
 ## What you need
-- Node.js and git (`ril preflight recipes/cli` checks both).
-- The permissions in `recipe.json` (node, git, `npm install`, `npm ci`, `npm pack`, `npm test` and `npm run verify`) let the agent run the project it builds.
+- Node.js and git (`ril preflight` checks both when `tools.json` lists them).
+- The permissions in `tools.json` once approved (node, git, `npm install`, `npm ci`, `npm pack`, `npm test` and `npm run verify`) let the agent run the project it builds.
 - The scenario: its id, its criterion (the sentence that must be true) and the checkpoint (the saved
   version of the code you are proving).
 

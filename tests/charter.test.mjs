@@ -111,7 +111,7 @@ test('every file under lib/ and bin/ is at most 300 lines, and there are at most
 // Names built from fragments so this file never contains them.
 const FORBIDDEN = [['ps', 'tack'], ['pot', 'eto'], ['super', 'powers']].map((parts) => parts.join(''));
 const namesIn = (text) => FORBIDDEN.filter((name) => text.toLowerCase().includes(name));
-const SHIPPED = ['skills', 'agents', 'templates', 'recipes', 'principles.md', 'lib', 'bin', 'README.md', 'docs/decisions.md', 'CHARTER.md'];
+const SHIPPED = ['skills', 'agents', 'templates', 'examples', 'principles.md', 'lib', 'bin', 'README.md', 'docs/decisions.md', 'CHARTER.md'];
 
 test('no tracked shipped file names another plugin or product', () => {
   const r = spawnSync('git', ['ls-files', '-z', '--', ...SHIPPED], { cwd: repoRoot, encoding: 'utf8' });

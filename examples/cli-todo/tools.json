@@ -1,31 +1,30 @@
 {
-  "name": "cli",
-  "type": "cli",
   "requires": [
     {
       "name": "node",
       "detect": "node --version",
       "install": { "darwin": "brew install node", "win32": "winget install OpenJS.NodeJS.LTS", "linux": null },
       "guide": "Node.js runs the project. Download the LTS version from nodejs.org, run the installer, then open a new terminal window and check that 'node --version' prints a number.",
-      "human": false
+      "human": false,
+      "reason": "It runs the to-do program and its checks."
     },
     {
       "name": "git",
       "detect": "git --version",
       "install": { "darwin": "brew install git", "win32": "winget install Git.Git", "linux": null },
       "guide": "Git keeps the saved versions of the project. Download it from git-scm.com, run the installer with the default choices, then open a new terminal window and check that 'git --version' prints a number.",
-      "human": false
+      "human": false,
+      "reason": "It keeps a saved version of the work at every step."
     },
     {
       "name": "git identity",
       "detect": "git config user.email",
       "install": { "darwin": null, "win32": null, "linux": null },
       "guide": "Run these three commands inside your project folder, with your own name and email (this only affects this project): git init, then git config user.name \"Your Name\" and git config user.email \"you@example.com\"",
-      "human": true
+      "human": true,
+      "reason": "Saved versions need a name and an email on them."
     }
   ],
-  "methods": { "cli": "proven-cli" },
-  "allowlist": {
-    "claude": ["Bash(node *)", "Bash(npm test)", "Bash(npm test *)", "Bash(npm run verify)", "Bash(npm run verify *)", "Bash(npm install *)", "Bash(npm ci)", "Bash(npm pack *)", "Bash(git *)"]
-  }
+  "allow": ["Bash(node *)", "Bash(npm test)", "Bash(npm test *)", "Bash(npm run verify)", "Bash(npm run verify *)", "Bash(npm install *)", "Bash(npm ci)", "Bash(npm pack *)", "Bash(git *)"],
+  "humanSteps": ["Set your name and email for saved versions, once, when asked."]
 }
