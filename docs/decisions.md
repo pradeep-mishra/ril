@@ -29,7 +29,7 @@ a real run, and the failure is named in the Run log below.
 | Budget lowered in R3: one router, five playbooks, two references, one worker agent: skills 8 to 1, agents 6 to 1, direction words 14,532 to 5,500, banned hits 85 to 0; `tests/skills.test.mjs` is structural only (no prose pins). Removed rules are in `docs/cut-list.md` | Test: `tests/charter.test.mjs` |
 | Workers never change state; only the verifier records a result | Skill instruction only (worker rules). The allowlist entry `Bash(ril *)` lets any agent run any `ril` command |
 | The verifier is independent of the builders | Rail 1 needs a registered agent whose role is `verifier`, but anyone can register one. Skill instruction only |
-| Router rules: only fresh workers with a full brief; never spawn an unregistered agent; the controller never runs the product, its tests or the proof, and never changes tracked files; refuse roles outside the six | Skill instruction only (router `skills/ril/SKILL.md`). The CLI refuses an unknown role at `ril agent register` |
+| Router rules: only fresh workers with a full brief; never spawn an unregistered agent; the controller never runs the product, its tests or the proof, and never changes tracked files; refuse roles the CLI does not know | Skill instruction only (router `skills/ril/SKILL.md`). The CLI refuses an unknown role at `ril agent register` |
 | Every worker reads `skills/ril/worker-rules.md` and `principles.md` first | Instruction only. The CLI checks only that the brief lists two rules paths |
 | Retry by failure kind (cap or memory: smaller scope; network: as is; unknown: once; then park) | Skill instruction only (router) |
 | Light review for plans, full review for built code | Skill instruction only (`skills/ril/references/review.md`) |

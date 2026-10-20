@@ -1,60 +1,59 @@
 # RIL
 
-## What it does
+RIL is a Claude Code plugin that turns an idea, described in plain words, into working software that has been proven by running it.
+You answer a few questions. RIL writes down what the software must do, builds it test first, and checks each promise on the real thing before it says it is done.
+It is made for anyone, not only developers, and aims to work for any kind of software.
 
-RIL is a Claude Code plugin that turns an idea you describe in plain words into a small program that runs on your own machine.
-It asks you a few questions, writes down what the program must do, builds it test first, and proves every promise by running the real program before it says it is done.
+## Install and start
 
-## What you need
+You need Claude Code, Node.js 20.10 or newer, and git.
+There is no published copy yet, so use a local copy of this folder.
 
-- Claude Code.
-- Node.js 20.10 or newer.
-- git, with your name and email set for the project. If git does not know them yet, RIL shows you the three commands to set them for that project only:
-  `git init`, then `git config user.name "Your Name"` and `git config user.email "you@example.com"`.
+- Try it for one session: `claude --plugin-dir <path to this folder>`
+- Install it as a Claude Code plugin, inside Claude Code:
+  `/plugin marketplace add <path to this folder>` then `/plugin install ril@ril`, then start a new session.
 
-## Install
+Then make an empty folder, open Claude Code in it, type `/ril` and describe what you want.
+Say yes when Claude Code asks you to trust the folder, so RIL's helpers can work without stopping to ask.
+If git does not know your name and email, RIL shows you the exact commands to set them for this project only.
 
-There is no remote copy of RIL published yet, so you install it from a local copy of this folder.
+## What happens
 
-To try it for one session, start Claude Code with the plugin folder:
+The path is: idea, design, spec, plan, tasks, tests, build, proof, fixes, run, done.
+
+- **Two modes.** You pick one at the start. Autonomous: RIL decides and tells you what it decided. Guided: RIL also asks you to sign off each stage's key document.
+- **What you are asked.** Plain questions, one at a time, with RIL's pick as the default. RIL stops and asks first before it spends money, deletes data, uses secrets, publishes or sends anything off this computer, or does anything else risky.
+- **What "proven" means.** Each promise in the spec is a scenario. A scenario is proven only when a separate checker, not the builder, ran the real software the way a person would, kept the evidence, had the work reviewed, and tried to break it. If any proof fails, the failure goes back to a fixer, round after round, up to a limit.
+- **Done** means every scenario is proven on the current saved version, or set aside with your explicit okay. The final report says what is not covered.
+
+Your folder gets `.ril/` (state, documents, evidence), a permissions file for the helpers, a short block in `CLAUDE.md` and `AGENTS.md`, and a git repository.
+
+## If it stops
+
+Close the window, lose the machine, crash: open Claude Code in the same folder and type `/ril`.
+RIL checks the project, repairs what is safe, tells you what happened, and continues. Proven work is not redone.
+
+## What is in the repo
 
 ```
-claude --plugin-dir <path to this folder>
+skills/ril/       the one skill: router (SKILL.md), playbooks/, references/, worker-rules.md
+agents/           ril-agent, the one worker agent
+templates/        briefs, reports, spec, verification and final-report forms
+bin/  lib/        the ril command line: state, rails and recovery (no dependencies)
+tests/            node tests; tests/e2e has the manual run guide
+examples/         a worked proof kit, labelled as an example
+docs/             decisions.md, cut-list.md, spikes.md
+CHARTER.md  principles.md
 ```
 
-To install it for good, run these inside Claude Code:
+## Tests
 
-```
-/plugin marketplace add <path to this folder>
-/plugin install ril@ril
-```
+`npm test` (same as `node --test`). It needs only Node.
+A real run with a model cannot be automated: follow `tests/e2e/RUNBOOK.md`.
 
-Then start a new session so the plugin is loaded.
+## Charter, decisions, limits
 
-## Start
+- `CHARTER.md` holds the owner's words and the size targets every change is checked against.
+- `docs/decisions.md` lists every rule, what enforces it, the run log, and the known limits: rules that are only instructions to an agent, not checked by code.
 
-1. Make a new, empty folder for your project.
-2. Open Claude Code in that folder.
-3. Type `/ril` and describe what you want.
-
-Claude Code asks you once to trust the folder. Say yes, so RIL's helpers can work without stopping to ask you.
-
-## What it creates
-
-Inside your project folder, RIL creates:
-
-- `.ril/`: the project's state, its documents, the proofs and their evidence.
-- `.claude/settings.json`: the permissions its helpers need to work in this folder.
-- `CLAUDE.md` and `AGENTS.md`: a short block in each that sends work in this folder through RIL.
-- A git repository, so every step is saved and can be looked at again.
-
-## Resume
-
-If the session stops for any reason (you close the window, the machine restarts), open Claude Code in the same folder and type `/ril` again.
-RIL checks the project, tells you what happened and carries on from where it was.
-
-## Limits
-
-- This version builds command-line programs only: programs you run by typing a command in a terminal.
-- Windows is not verified yet.
-- Nothing is deployed or published: the program stays on your machine.
+Known limits in short: real runs so far covered one command-line tool only, so other kinds of software are a goal, not a measured result. Windows is not verified. Nothing is deployed or published. See `docs/decisions.md` for the full list.

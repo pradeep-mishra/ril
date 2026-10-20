@@ -39,16 +39,16 @@ For every place the run needed a human, stalled, or needed an extra rule, add a 
 Name the failure you saw, not a guess about its cause, and say what was changed. Add a new rule only for a failure that repeated.
 If a step above could not be done, say that in the log too.
 
-## Gate before R2 merges to develop (manual)
+## Mid-session permission check (manual)
 
-R2 writes the permission rules mid-session. Check once that Claude Code applies them without a restart.
+The plugin writes the permission rules mid-session. Check once that Claude Code applies them without a restart.
 
 1. In an empty folder, start a session with the plugin and run `ril init`.
 2. In that same session run `ril allowlist write --base --tool claude`. Do not restart. Accept the trust prompt if one appears.
 3. In the same session ask for a small file edit, then ask for a `git status`.
 4. Note whether any permission prompt appeared for the edit or for `git status`, and add the result to the Run log in `docs/decisions.md`.
 
-If a prompt appears, the rules do not apply mid-session. Then approval must happen before the build session starts: the design stage writes and approves the tool list, runs `ril allowlist write --approved --tool claude`, ends the session, and asks the person to type `/ril` in a new one. Change the skills to say so before R2 merges.
+If a prompt appears, the rules do not apply mid-session. Then approval must happen before the build session starts: the design stage writes and approves the tool list, runs `ril allowlist write --approved --tool claude`, ends the session, and asks the person to type `/ril` in a new one. Change the design playbook to say so.
 
 ## What cannot be tested here (owner re-checks)
 
