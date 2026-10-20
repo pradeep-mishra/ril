@@ -47,7 +47,7 @@ a real run, and the failure is named in the Run log below.
 
 These rules are only an instruction to an agent, or nothing yet. A model that ignores them is not stopped by RIL.
 
-- The seal: any agent that can run `ril checkpoint --seal` can reseal changed files, or edit the `Protected:` line of `verify.md` or `state.json`; only a restored file is checked, who restored it is not.
+- The seal: any agent that can run `ril checkpoint --seal` can reseal changed files, or edit the `Protected:` line of `verify.md` or `state.json`; only a restored file is checked, who restored it is not. Git-ignored protected paths and symlink targets outside the project are invisible to it.
 - Workers changing state: `Bash(ril *)` still lets any agent run any `ril` command, including registering a fake verifier.
 - Verifier independence: anyone can register an agent with the role `verifier`.
 - The allowlist grants `Edit(./**)` and `Bash(node *)` (and `Bash(git *)`, `Bash(npm install *)`), which let workers run and change the project they build. The deny entries stop only the Edit tool from writing the state files; a worker running `node` or `git` can still write them. State integrity against a determined agent is not protected: there is no signing and no state kept outside the project.
