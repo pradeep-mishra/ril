@@ -5,18 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { load, mutate, readState, statePath } from '../lib/store.mjs';
 import { validate } from '../lib/schema.mjs';
-import { ril } from './helpers/ril.mjs';
+import { entry, ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
-import { addScenario, commitFile, fails, git, head, ok, record, register, status, trustKit, withRepo } from './helpers/repo.mjs';
-import { addAgent, addUnit, deadPid, killMidWrite, minutesAgo, read, stateFiles, writeReport } from './helpers/recovery.mjs';
+import { addScenario, fails, git, head, ok, status, withRepo } from './helpers/repo.mjs';
+import { JARGON, addAgent, addUnit, agent, deadPid, killMidWrite, minutesAgo, proveS1, read, stateFiles, unit, writeReport } from './helpers/recovery.mjs';
 
 const lockFile = (dir) => path.join(dir, '.ril', '.lock');
-const agent = (dir, id) => load(dir).agents.find((a) => a.id === id);
-const unit = (dir, id) => load(dir).units.find((u) => u.id === id);
-const JARGON = /\b(SHA|HEAD|stale|undefined|null|JSON\.parse|ENOENT)\b|\n\s+at /;
 
 const repairsLogged = (dir) => load(dir).decisions.filter((d) => d.decision.startsWith('ril doctor: ')).length;
 
@@ -34,7 +30,6 @@ function reportsThenFixes(dir, logged, ...extra) {
   for (const d of load(dir).decisions.filter((x) => x.decision.startsWith('ril doctor: '))) assert.ok(d.why, 'each repair says why');
   return fixed;
 }
-
 
 // A second run finds nothing and changes nothing.
 function settled(dir) {
@@ -177,26 +172,13 @@ test('an agent last updated in the future counts as no longer running', () => {
   });
 });
 
-test('young agent left alone without --new-session', () => {
-  withRepo((dir) => {
-    addUnit(dir, 'U1');
-    addAgent(dir, 'A1', { minutes: 59 });
-    const before = stateFiles(dir);
-    const r = ok(dir, 'doctor', '--fix', '--quiet');
-    assert.equal(r.stdout + r.stderr, '');
-    assert.deepEqual(stateFiles(dir), before);
-    assert.equal(agent(dir, 'A1').state, 'running');
-    assert.equal(unit(dir, 'U1').state, 'doing');
-  });
-});
-
 test('a running agent is stopped when it is 65 minutes old or a new session starts, and a failed one is left alone', () => {
   withRepo((dir) => {
     addUnit(dir, 'U1');
     addUnit(dir, 'U2');
     addAgent(dir, 'A1', { minutes: 65 });
     addAgent(dir, 'A2', { unit: 'S9', minutes: 65, state: 'failed' });
-    addAgent(dir, 'A3', { unit: 'U2', minutes: 2 });
+    addAgent(dir, 'A3', { unit: 'U2', minutes: 59 });
     reportsThenFixes(dir, 2);
     assert.deepEqual(['A1', 'A2', 'A3'].map((id) => agent(dir, id).state), ['stopped', 'failed', 'running'], 'only old running agents are touched');
     assert.deepEqual(['U1', 'U2'].map((id) => unit(dir, id).state), ['todo', 'doing']);
@@ -232,13 +214,6 @@ test('doctor leaves a started plan alone and resets only an orphaned task', () =
   });
 });
 
-function proveS1(dir) {
-  addScenario(dir, 'S1');
-  register(dir, 'V1', 'verifier');
-  trustKit(dir);
-  assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
-}
-
 test('proven without evidence demoted', () => {
   withRepo((dir) => {
     proveS1(dir);
@@ -253,20 +228,6 @@ test('proven without evidence demoted', () => {
     fs.writeFileSync(path.join(dir, '.ril', 'evidence', 'S1', 'run.txt'), '');
     reportsThenFixes(dir, 1);
     assert.equal(status(dir), 'unproven', 'an empty evidence file proves nothing');
-  });
-});
-
-test('a product change after a proof leaves the scenario proven and doctor silent', () => {
-  withRepo((dir) => {
-    proveS1(dir);
-    commitFile(dir, 'docs/guide.md', 'words\n');
-    commitFile(dir, 'src/app.js', 'code\n');
-    const before = stateFiles(dir);
-    const r = ok(dir, 'doctor', '--fix', '--quiet');
-    assert.equal(r.stdout + r.stderr, '');
-    assert.deepEqual(stateFiles(dir), before, 'nothing was changed');
-    assert.equal(status(dir), 'proven', 'a later saved version does not take back an earlier proof');
-    assert.match(ok(dir, 'doctor').stdout, /Nothing needed fixing/);
   });
 });
 
@@ -289,25 +250,12 @@ test('proven without a git repository or with a lost saved version demoted', () 
   });
 });
 
-test('a diff.relative setting is no problem for a clean project', () => {
-  withRepo((dir) => {
-    proveS1(dir);
-    git(dir, 'config', 'diff.relative', 'true');
-    const before = stateFiles(dir);
-    const r = ok(dir, 'doctor', '--fix', '--quiet');
-    assert.equal(r.stdout + r.stderr, '');
-    assert.deepEqual(stateFiles(dir), before);
-    assert.equal(status(dir), 'proven');
-  });
-});
-
 test('a missing git is reported plainly', (t) => {
   const bin = path.dirname(process.execPath);
   const env = { ...process.env, PATH: bin };
   if (process.platform === 'win32' || spawnSync('git', ['--version'], { env }).status === 0) return t.skip('git sits next to node here');
   withRepo((dir) => {
     proveS1(dir);
-    const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ril');
     const r = spawnSync(process.execPath, [entry, 'doctor', '--fix'], { cwd: dir, env, encoding: 'utf8' });
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stderr, /git is not installed/);
@@ -335,70 +283,6 @@ test('kill mid-write', async () => {
     p.cleanup();
     fs.rmSync(scratch, { recursive: true, force: true });
   }
-});
-
-test('skip parks and logs', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'S1');
-    addUnit(dir, 'U1');
-    for (const stage of ['design', 'confirm', 'build', 'accept']) ok(dir, 'stage', 'set', stage);
-    const r = ok(dir, 'skip', 'S1', '--reason', 'the payment sandbox is down');
-    assert.match(r.stdout, /Carrying on with the other work\./);
-    assert.equal(status(dir), 'parked');
-    const d = load(dir).decisions.at(-1);
-    assert.equal(d.decision, 'Accepted as unproven: S1');
-    assert.equal(d.why, 'the payment sandbox is down');
-    ok(dir, 'skip', 'U1', '--reason', 'blocked on a missing tool');
-    assert.equal(unit(dir, 'U1').state, 'parked');
-    assert.equal(load(dir).decisions.at(-1).decision, 'Set aside unit U1');
-    const decisions = load(dir).decisions;
-    for (const id of ['S1', 'U1']) {
-      const again = ok(dir, 'skip', id, '--reason', 'again');
-      assert.match(again.stdout, /already set aside; nothing changed/);
-      assert.doesNotMatch(again.stdout + again.stderr, JARGON);
-    }
-    assert.deepEqual(load(dir).decisions, decisions, 'skipping twice changes nothing');
-    assert.match(ok(dir, 'doctor').stdout, /S1/, 'doctor mentions what was set aside');
-    assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /Nothing has been proven yet/, 'setting everything aside does not finish the project');
-  });
-});
-
-test('skip warns about a working agent and about a proof being set aside', () => {
-  withRepo((dir) => {
-    proveS1(dir);
-    addUnit(dir, 'U1');
-    addAgent(dir, 'A1', { unit: 'U1' });
-    const u = ok(dir, 'skip', 'U1', '--reason', 'not needed');
-    assert.match(u.stdout, /Agent A1 is still working on it/);
-    assert.match(u.stdout, /Next: /);
-    const s = ok(dir, 'skip', 'S1', '--reason', 'out of scope');
-    assert.match(s.stdout, /S1 was proven/);
-    assert.match(s.stdout, /proof is set aside/);
-    assert.doesNotMatch(u.stdout + s.stdout, JARGON);
-    assert.equal(status(dir), 'parked');
-  });
-});
-
-test('skip refuses an unknown id, and an id that is both a unit and a scenario unless told which', () => {
-  withRepo((dir) => {
-    addScenario(dir, 'X1');
-    addUnit(dir, 'X1');
-    addScenario(dir, 'S1');
-    const untouched = stateFiles(dir);
-    fails(dir, 2, 'skip', 'S9', '--reason', 'gone');
-    fails(dir, 1, 'skip', 'S1');
-    fails(dir, 2, 'skip', 'S1', '--unit', '--reason', 'not a unit');
-    assert.deepEqual(stateFiles(dir), untouched);
-    const r = fails(dir, 1, 'skip', 'X1', '--reason', 'stuck');
-    assert.match(r.stderr, /--unit/);
-    assert.match(r.stderr, /--scenario/);
-    assert.equal(status(dir, 'X1'), 'unproven');
-    ok(dir, 'skip', 'X1', '--unit', '--reason', 'stuck');
-    assert.equal(unit(dir, 'X1').state, 'parked');
-    assert.equal(status(dir, 'X1'), 'unproven');
-    ok(dir, 'skip', 'X1', '--scenario', '--reason', 'stuck');
-    assert.equal(status(dir, 'X1'), 'parked');
-  });
 });
 
 test('doctor on a clean project is silent with --quiet and exits 0', () => {

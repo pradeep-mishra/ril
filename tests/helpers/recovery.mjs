@@ -1,12 +1,17 @@
 // Builders for broken situations, made by changing the state directly as a crash would leave it.
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mutate, statePath } from '../../lib/store.mjs';
+import { load, mutate, statePath } from '../../lib/store.mjs';
+import { addScenario, head, record, register, trustKit } from './repo.mjs';
 
 const child = path.join(path.dirname(fileURLToPath(import.meta.url)), 'store-child.mjs');
 
+export const JARGON = /\b(SHA|HEAD|stale|undefined|null|JSON\.parse|ENOENT)\b|\n\s+at /;
+export const agent = (dir, id) => load(dir).agents.find((a) => a.id === id);
+export const unit = (dir, id) => load(dir).units.find((u) => u.id === id);
 export const minutesAgo = (n) => new Date(Date.now() - n * 60_000).toISOString();
 export const read = (file) => fs.readFileSync(file, 'utf8');
 export const stateFiles = (dir) => [statePath(dir), `${statePath(dir)}.bak`].map((f) => (fs.existsSync(f) ? read(f) : null));
@@ -60,4 +65,12 @@ export function killMidWrite(dir, marker, { startMs = 30_000 } = {}) {
       else reject(new Error('the child stopped before it saved a change'));
     });
   });
+}
+
+// A project where scenario S1 is proven by verifier V1 at the current saved version.
+export function proveS1(dir) {
+  addScenario(dir, 'S1');
+  register(dir, 'V1', 'verifier');
+  trustKit(dir);
+  assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
 }

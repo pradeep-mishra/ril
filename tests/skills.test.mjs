@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ril } from './helpers/ril.mjs';
 import { tmpProject } from './helpers/tmp.mjs';
-import { checkBrief } from '../lib/brief.mjs';
+import { checkBrief } from '../lib/commands/agent.mjs';
 import { kitHash, kitTrust } from '../lib/proof.mjs';
 import { headings, helpGroups, readFile, repoRoot, rilCommandsIn } from './helpers/skills.mjs';
 

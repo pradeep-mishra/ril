@@ -2,23 +2,26 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ril } from './ril.mjs';
 import { tmpProject } from './tmp.mjs';
 import { load } from '../../lib/store.mjs';
 
-// Children inherit this: a fixed identity and no commit signing, whatever the machine's own git settings are.
+// Children inherit this: a fixed identity, no commit signing and no hooks, whatever the machine's own git settings are.
 Object.assign(process.env, {
   GIT_AUTHOR_NAME: 'Ril Test',
   GIT_AUTHOR_EMAIL: 'ril-test@example.com',
   GIT_COMMITTER_NAME: 'Ril Test',
   GIT_COMMITTER_EMAIL: 'ril-test@example.com',
-  GIT_CONFIG_COUNT: '2',
+  GIT_CONFIG_COUNT: '3',
   GIT_CONFIG_KEY_0: 'commit.gpgsign',
   GIT_CONFIG_VALUE_0: 'false',
   GIT_CONFIG_KEY_1: 'core.autocrlf',
   GIT_CONFIG_VALUE_1: 'false',
+  GIT_CONFIG_KEY_2: 'core.hooksPath',
+  GIT_CONFIG_VALUE_2: os.devNull,
 });
 
 export const fixture = (name) => path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', name);
@@ -46,11 +49,11 @@ export function gitInit(dir) {
 }
 
 // An initialised project inside a git repo with a local identity and one commit.
-export function withRepo(fn, { gitInit: withGit = true } = {}) {
+export function withRepo(fn, { gitInit: withGit = true, init = [] } = {}) {
   const p = tmpProject();
   try {
     if (withGit) gitInit(p.dir);
-    ok(p.dir, 'init');
+    ok(p.dir, 'init', ...init);
     if (withGit) {
       fs.writeFileSync(path.join(p.dir, 'README.md'), '# demo\n');
       git(p.dir, 'add', '-A');

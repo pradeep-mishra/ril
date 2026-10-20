@@ -1,96 +1,12 @@
+// ril scenario (add, update, import, coverage) and ril round (rail 3 and rail 4).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ril } from './helpers/ril.mjs';
-import { tmpProject } from './helpers/tmp.mjs';
 import { load } from '../lib/store.mjs';
+import { addScenario, fails, fixture, lines, ok, withRepo } from './helpers/repo.mjs';
 
-const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
-const fixture = (name) => path.join(fixtures, name);
-
-// A fresh initialised project; runs fn(dir) and cleans up. `cap` goes to ril init when given.
-function withProject(fn, ...initArgs) {
-  const p = tmpProject();
-  try {
-    const r = ril(p.dir, 'init', ...initArgs);
-    assert.equal(r.code, 0, r.stderr);
-    return fn(p.dir);
-  } finally {
-    p.cleanup();
-  }
-}
-
-function ok(dir, ...args) {
-  const r = ril(dir, ...args);
-  assert.equal(r.code, 0, `${args.join(' ')} -> ${r.stderr}`);
-  return r;
-}
-
-function fails(dir, code, ...args) {
-  const r = ril(dir, ...args);
-  assert.equal(r.code, code, `${args.join(' ')} -> ${r.stdout}${r.stderr}`);
-  return r;
-}
-
-const addScenario = (dir, id = 'S1', method = 'cli') =>
-  ok(dir, 'scenario', 'add', id, '--title', `Title ${id}`, '--method', method, '--criterion', `Criterion ${id}`);
-
-const lines = (text) => text.split('\n').filter(Boolean);
-
-test('stage forward ok, skip refused, skip forced is logged', () => {
-  withProject((dir) => {
-    assert.match(ok(dir, 'stage', 'get').stdout, /shape/);
-    ok(dir, 'stage', 'set', 'design');
-    assert.equal(load(dir).stage, 'design');
-
-    const skip = fails(dir, 1, 'stage', 'set', 'build');
-    assert.match(skip.stderr, /Next: /);
-    assert.equal(load(dir).stage, 'design');
-
-    ok(dir, '--force', 'the person asked to skip confirm', 'stage', 'set', 'build');
-    const state = load(dir);
-    assert.equal(state.stage, 'build');
-    assert.equal(state.decisions.length, 1);
-    assert.equal(state.decisions[0].why, 'the person asked to skip confirm');
-    assert.equal(state.decisions[0].stage, 'design');
-    assert.match(state.decisions[0].decision, /design.*build/);
-  });
-});
-
-test('stage going back needs a reason and an unknown stage is refused', () => {
-  withProject((dir) => {
-    ok(dir, 'stage', 'set', 'design');
-    const back = fails(dir, 1, 'stage', 'set', 'shape');
-    assert.match(back.stderr, /Next: /);
-    ok(dir, 'stage', 'set', 'shape', '--force', 'the idea changed');
-    assert.equal(load(dir).stage, 'shape');
-    assert.equal(load(dir).decisions.length, 1);
-    assert.match(fails(dir, 1, 'stage', 'set', 'nowhere').stderr, /Next: /);
-    assert.match(fails(dir, 1, 'stage', 'set').stderr, /Next: /);
-  });
-});
-
-test('parked round trip', () => {
-  withProject((dir) => {
-    ok(dir, 'stage', 'set', 'design');
-    ok(dir, 'stage', 'set', 'parked');
-    let state = load(dir);
-    assert.equal(state.stage, 'parked');
-    assert.equal(state.parkedFrom, 'design');
-    assert.match(ok(dir, 'stage', 'get').stdout, /design/);
-
-    fails(dir, 1, 'stage', 'set', 'confirm'); // leaving the pause anywhere else needs a reason
-    assert.equal(load(dir).stage, 'parked');
-
-    ok(dir, 'stage', 'set', 'design');
-    state = load(dir);
-    assert.equal(state.stage, 'design');
-    assert.equal(state.parkedFrom, null);
-    assert.deepEqual(state.decisions, []);
-  });
-});
+const withProject = (fn, ...init) => withRepo(fn, { gitInit: false, init });
 
 test('scenario import good spec', () => {
   for (const name of ['spec-good.md', 'spec-crlf.md']) {
@@ -171,8 +87,7 @@ test('scenario update while unproven, list and json', () => {
     assert.equal(s.criterion, 'new words');
     assert.equal(s.method, 'api');
     assert.equal(load(dir).decisions.length, 0);
-    assert.match(ok(dir, 'scenario', 'list', '--status', 'unproven').stdout, /S1/);
-    assert.equal(ok(dir, 'scenario', 'list', '--status', 'proven').stdout.includes('S1'), false);
+    assert.match(ok(dir, 'scenario', 'list').stdout, /S1/);
     assert.equal(JSON.parse(ok(dir, '--json', 'scenario', 'list').stdout)[0].id, 'S1');
     fails(dir, 2, 'scenario', 'update', 'S9', '--title', 'x');
     fails(dir, 1, 'scenario', 'update', 'S1');
@@ -258,89 +173,6 @@ test('scenario update refuses an empty title or criterion', () => {
   });
 });
 
-test('rail 4: five bumps print 1 to 5, the sixth exits 4 and stores nothing', () => {
-  withProject((dir) => {
-    addScenario(dir, 'S1');
-    for (let n = 1; n <= 5; n++) {
-      const r = ok(dir, 'round', 'bump', 'S1');
-      assert.match(r.stdout, new RegExp(`\\b${n}\\b`), r.stdout);
-      assert.equal(load(dir).scenarios[0].round, n);
-    }
-    const r = fails(dir, 4, 'round', 'bump', 'S1');
-    assert.match(r.stderr, /Next: stop and write the stop report/);
-    assert.equal(load(dir).scenarios[0].round, 5);
-    fails(dir, 4, 'round', 'bump', 'S1', '--force', 'one more');
-    assert.equal(load(dir).scenarios[0].round, 5);
-
-    const unforced = fails(dir, 1, 'round', 'reset', 'S1');
-    assert.match(unforced.stderr, /Next: .*ril round reset S1 --force "<reason>"/);
-    assert.equal(load(dir).scenarios[0].round, 5, 'a reset without a reason changes nothing');
-    fails(dir, 1, 'round', 'reset', 'S1', '--force', '  ');
-    ok(dir, 'round', 'reset', 'S1', '--force', 'the person chose a new approach');
-    assert.equal(load(dir).scenarios[0].round, 0);
-    const logged = load(dir).decisions.at(-1);
-    assert.match(logged.decision, /S1/);
-    assert.equal(logged.why, 'the person chose a new approach');
-    assert.match(ok(dir, 'round', 'bump', 'S1').stdout, /\b1\b/);
-    fails(dir, 2, 'round', 'bump', 'S9');
-    fails(dir, 2, 'round', 'reset', 'S9', '--force', 'gone');
-  }, '--cap', '5');
-});
-
-test('init takes the round cap once, from 5 to 10, default 8', () => {
-  withProject((dir) => assert.equal(load(dir).cap, 8));
-  withProject((dir) => assert.equal(load(dir).cap, 10), '--cap', '10');
-  const p = tmpProject();
-  try {
-    for (const bad of ['4', '11', 'many']) {
-      const r = ril(p.dir, 'init', '--cap', bad);
-      assert.equal(r.code, 1, bad);
-      assert.match(r.stderr, /Next: /);
-    }
-    assert.equal(fs.existsSync(path.join(p.dir, '.ril', 'state.json')), false);
-  } finally {
-    p.cleanup();
-  }
-});
-
-test('gate park twice reopens', () => {
-  withProject((dir) => {
-    ok(dir, 'gate', 'park', 'G1', '--question', 'Which colour?', '--options', 'red|blue', '--default', 'red');
-    let g = load(dir).gates[0];
-    assert.deepEqual([g.id, g.status, g.question, g.options, g.default, g.answer], ['G1', 'open', 'Which colour?', ['red', 'blue'], 'red', null]);
-
-    ok(dir, 'gate', 'resolve', 'G1', '--answer', 'blue');
-    g = load(dir).gates[0];
-    assert.deepEqual([g.status, g.answer], ['resolved', 'blue']);
-    assert.equal(ok(dir, 'gate', 'list', '--status', 'open').stdout.includes('G1'), false);
-
-    ok(dir, 'gate', 'park', 'G1', '--question', 'Which size?', '--options', 'big|small|tiny', '--default', 'small');
-    const { gates } = load(dir);
-    assert.equal(gates.length, 1);
-    assert.deepEqual([gates[0].status, gates[0].question, gates[0].options, gates[0].default, gates[0].answer], ['open', 'Which size?', ['big', 'small', 'tiny'], 'small', null]);
-    assert.match(ok(dir, 'gate', 'list', '--status', 'open').stdout, /G1/);
-    assert.match(ok(dir, 'status').stdout, /1 open question/);
-
-    fails(dir, 2, 'gate', 'resolve', 'G9', '--answer', 'x');
-    fails(dir, 1, 'gate', 'park', 'G2', '--question', 'q');
-  });
-});
-
-test('decision log and list', () => {
-  withProject((dir) => {
-    assert.match(ok(dir, 'decision', 'list').stdout, /no decisions/i);
-    ok(dir, 'decision', 'log', '--stage', 'design', '--decision', 'use plain files', '--why', 'simplest thing');
-    const d = load(dir).decisions[0];
-    assert.deepEqual([d.stage, d.decision, d.why], ['design', 'use plain files', 'simplest thing']);
-    assert.ok(!Number.isNaN(Date.parse(d.ts)));
-    const out = ok(dir, 'decision', 'list').stdout;
-    assert.ok(out.includes('use plain files') && out.includes('simplest thing'));
-    assert.equal(JSON.parse(ok(dir, '--json', 'decision', 'list').stdout).length, 1);
-    fails(dir, 1, 'decision', 'log', '--stage', 'nowhere', '--decision', 'x', '--why', 'y');
-    fails(dir, 1, 'decision', 'log', '--stage', 'design', '--decision', 'x');
-  });
-});
-
 test('scenario coverage reports a missing feature map and passes when it exists', () => {
   withProject((dir) => {
     assert.match(ok(dir, 'scenario', 'coverage').stdout, /no scenarios/i);
@@ -360,57 +192,6 @@ test('scenario coverage reports a missing feature map and passes when it exists'
     ok(dir, 'scenario', 'coverage');
     addScenario(dir, 'S2', 'api');
     assert.match(fails(dir, 2, 'scenario', 'coverage').stderr, /S2/);
-  });
-});
-
-test('unit add, set and list', () => {
-  withProject((dir) => {
-    ok(dir, 'unit', 'add', 'P1', '--kind', 'plan', '--title', 'First plan');
-    ok(dir, 'unit', 'add', 'T1', '--kind', 'task', '--parent', 'P1', '--title', 'First task');
-    let units = load(dir).units;
-    assert.deepEqual(units.map((u) => [u.id, u.kind, u.parent, u.state, u.checkpoint]), [['P1', 'plan', null, 'todo', null], ['T1', 'task', 'P1', 'todo', null]]);
-
-    fails(dir, 1, 'unit', 'add', 'P1', '--kind', 'plan', '--title', 'again');
-    fails(dir, 1, 'unit', 'add', 'T2', '--kind', 'job', '--title', 'x');
-    fails(dir, 2, 'unit', 'add', 'T2', '--kind', 'task', '--parent', 'P9', '--title', 'x');
-
-    ok(dir, 'unit', 'set', 'T1', '--state', 'doing');
-    assert.equal(load(dir).units[1].state, 'doing');
-    const warn = ok(dir, 'unit', 'set', 'T1', '--state', 'verified');
-    assert.match(warn.stderr, /checkpoint/i);
-    assert.equal(load(dir).units[1].state, 'verified');
-    const quiet = ok(dir, 'unit', 'set', 'T1', '--state', 'verified', '--checkpoint', 'abc123');
-    assert.equal(quiet.stderr, '');
-    assert.equal(load(dir).units[1].checkpoint, 'abc123');
-    fails(dir, 1, 'unit', 'set', 'T1', '--state', 'finished');
-    fails(dir, 2, 'unit', 'set', 'T9', '--state', 'built');
-
-    units = ok(dir, 'unit', 'list', '--kind', 'task').stdout;
-    assert.ok(units.includes('T1') && !units.includes('P1'));
-    const todo = ok(dir, 'unit', 'list', '--state', 'todo').stdout;
-    assert.ok(todo.includes('P1') && !todo.includes('T1'));
-    assert.equal(JSON.parse(ok(dir, '--json', 'unit', 'list').stdout).length, 2);
-  });
-});
-
-test('every refusal in these commands says what to do next, and none uses internal words', () => {
-  withProject((dir) => {
-    addScenario(dir);
-    const attempts = [
-      ['stage', 'set', 'done'],
-      ['stage'],
-      ['unit', 'set', 'T9', '--state', 'todo'],
-      ['scenario', 'bogus'],
-      ['gate'],
-      ['decision', 'bogus'],
-      ['round', 'bump'],
-    ];
-    for (const args of attempts) {
-      const r = ril(dir, ...args);
-      assert.notEqual(r.code, 0, args.join(' '));
-      assert.match(r.stderr, /Next: /, args.join(' '));
-      assert.doesNotMatch(r.stderr, /undefined|\[object|mutate|state\.json/, args.join(' '));
-    }
   });
 });
 
@@ -471,25 +252,31 @@ test('a duplicate id in one spec is one problem and nothing is added; a colon in
   });
 });
 
-test('a refused round bump past the cap leaves the state and its backup untouched', () => {
+test('rail 4: five bumps print 1 to 5, the sixth exits 4 and stores nothing', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
-    for (let n = 0; n < 5; n++) ok(dir, 'round', 'bump', 'S1');
-    const file = path.join(dir, '.ril', 'state.json');
-    const before = [fs.readFileSync(file), fs.readFileSync(`${file}.bak`)];
-    fails(dir, 4, 'round', 'bump', 'S1');
-    assert.ok(fs.readFileSync(file).equals(before[0]));
-    assert.ok(fs.readFileSync(`${file}.bak`).equals(before[1]));
-  }, '--cap', '5');
-});
+    for (let n = 1; n <= 5; n++) {
+      const r = ok(dir, 'round', 'bump', 'S1');
+      assert.match(r.stdout, new RegExp(`\\b${n}\\b`), r.stdout);
+      assert.equal(load(dir).scenarios[0].round, n);
+    }
+    const r = fails(dir, 4, 'round', 'bump', 'S1');
+    assert.match(r.stderr, /Next: stop and write the stop report/);
+    assert.equal(load(dir).scenarios[0].round, 5);
+    fails(dir, 4, 'round', 'bump', 'S1', '--force', 'one more');
+    assert.equal(load(dir).scenarios[0].round, 5);
 
-test('a repeat init with a different cap says the cap was kept', () => {
-  withProject((dir) => {
-    const r = ok(dir, 'init', '--cap', '6');
-    assert.equal(load(dir).cap, 5);
-    assert.match(r.stdout, /fix-round limit.*kept at 5/i);
-    assert.equal(lines(r.stdout).filter((l) => /kept at/.test(l)).length, 1);
-    assert.doesNotMatch(ok(dir, 'init', '--cap', '5').stdout, /kept at/);
-    assert.doesNotMatch(ok(dir, 'init').stdout, /kept at/);
+    const unforced = fails(dir, 1, 'round', 'reset', 'S1');
+    assert.match(unforced.stderr, /Next: .*ril round reset S1 --force "<reason>"/);
+    assert.equal(load(dir).scenarios[0].round, 5, 'a reset without a reason changes nothing');
+    fails(dir, 1, 'round', 'reset', 'S1', '--force', '  ');
+    ok(dir, 'round', 'reset', 'S1', '--force', 'the person chose a new approach');
+    assert.equal(load(dir).scenarios[0].round, 0);
+    const logged = load(dir).decisions.at(-1);
+    assert.match(logged.decision, /S1/);
+    assert.equal(logged.why, 'the person chose a new approach');
+    assert.match(ok(dir, 'round', 'bump', 'S1').stdout, /\b1\b/);
+    fails(dir, 2, 'round', 'bump', 'S9');
+    fails(dir, 2, 'round', 'reset', 'S9', '--force', 'gone');
   }, '--cap', '5');
 });

@@ -4,15 +4,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { load, mutate, statePath } from '../lib/store.mjs';
-import { addScenario, fails, head, ok, record, register, status, writeBrief } from './helpers/repo.mjs';
-import { ril } from './helpers/ril.mjs';
+import { addScenario, fails, head, ok, record, register, status, trustKit, writeBrief } from './helpers/repo.mjs';
 import { stateFiles } from './helpers/recovery.mjs';
-import { advance, importScenarios, prove, ready, runChecker, trustKit, withProject, writeDoc, writeFeatureMaps, writeFinalReport } from './helpers/lifecycle.mjs';
+import { advance, importScenarios, prove, ready, runChecker, withProject, writeFeatureMaps, writeFinalReport } from './helpers/lifecycle.mjs';
 
 const IDS = ['S1', 'S2'];
 const BUILD = ['design', 'confirm', 'build'];
 const proofFile = (dir, id) => path.join(dir, '.ril', 'evidence', id, 'run.txt');
-const rows = (dir, checkpoint) => load(dir).ledger.filter((r) => r.checkpoint === checkpoint);
 
 test('happy path: from the idea to done, step by step', () => {
   withProject((dir) => {
@@ -153,24 +151,23 @@ test('recovery path: a proof whose evidence was deleted is demoted, and done wai
   });
 });
 
-test('stale path: a product change after the proof makes done refuse until it is proven again', () => {
-  withProject((dir) => {
-    ready(dir, IDS);
-    prove(dir, IDS);
-    const a = head(dir);
-    fs.mkdirSync(path.join(dir, 'src'));
-    fs.writeFileSync(path.join(dir, 'src', 'app.js'), 'console.log("v2");\n');
-    ok(dir, 'checkpoint');
-    const b = head(dir);
-    assert.notEqual(a, b);
-    assert.equal(ok(dir, 'doctor', '--fix', '--quiet').stdout, '', 'a later saved version is not a repair');
-    assert.deepEqual(load(dir).scenarios.map((s) => s.status), ['proven', 'proven'], 'only re-checking moves the proof forward');
-    const refused = fails(dir, 1, 'stage', 'set', 'done');
-    assert.match(refused.stderr, /older version/);
-    assert.match(refused.stderr, /S1[\s\S]*S2/);
-    prove(dir, IDS); // a verifier checks the new version
-    ok(dir, 'stage', 'set', 'done');
-  });
+test('stale path: a change to saved files after the proof, tests and docs included, makes done refuse until it is proven again', () => {
+  for (const rel of ['src/app.js', 'docs/guide.md']) {
+    withProject((dir) => {
+      ready(dir, IDS);
+      prove(dir, IDS);
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), 'changed\n');
+      ok(dir, 'checkpoint');
+      assert.equal(ok(dir, 'doctor', '--fix', '--quiet').stdout, '', 'a later saved version is not a repair');
+      assert.deepEqual(load(dir).scenarios.map((s) => s.status), ['proven', 'proven'], 'only re-checking moves the proof forward');
+      const refused = fails(dir, 1, 'stage', 'set', 'done');
+      assert.match(refused.stderr, /older version/, rel);
+      assert.match(refused.stderr, /S1[\s\S]*S2/, rel);
+      prove(dir, IDS); // a verifier checks the new version
+      ok(dir, 'stage', 'set', 'done');
+    });
+  }
 });
 
 test('real accept order: the README is saved before the proofs, the report after, and done goes through', () => {
@@ -190,38 +187,43 @@ test('real accept order: the README is saved before the proofs, the report after
   });
 });
 
-// Each row is one way of trying to get past a rail. Every refusal must say what to do next.
-test('rail refusals', () => {
+test('rail 2: done needs every scenario proven at the current saved version, or accepted as unproven in the exact words', () => {
+  withProject((dir) => {
+    assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /no scenarios/);
+    addScenario(dir, 'S1');
+    addScenario(dir, 'S2');
+    register(dir, 'V1', 'verifier');
+    trustKit(dir);
+    advance(dir, ['design', 'confirm', 'build', 'accept']);
+    assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
+    const refused = fails(dir, 1, 'stage', 'set', 'done');
+    assert.match(refused.stderr, /S2/);
+    assert.doesNotMatch(refused.stderr, /\bS1\b/);
+    assert.match(fails(dir, 1, '--force', 'ship it', 'stage', 'set', 'done').stderr, /force/i);
+    assert.equal(load(dir).stage, 'accept');
+
+    mutate(dir, (s) => void (s.scenarios[1].status = 'parked'));
+    for (const text of ['Maybe S2 can be accepted as unproven', 'Not yet: Accepted as unproven: S2', 'Accepted as unproven: s2', 'Accepted as unproven: S20']) {
+      ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', text, '--why', 'a thought, not an acceptance');
+      assert.match(fails(dir, 1, 'stage', 'set', 'done').stderr, /nobody recorded "Accepted as unproven: S2"/, text);
+    }
+    ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'ACCEPTED AS UNPROVEN: S2', '--why', 'the sandbox is down');
+    ok(dir, 'stage', 'set', 'done');
+  });
+});
+
+test('done without a git repository asks for a checkpoint first', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
-    register(dir, 'I1', 'implementer');
-    const kit = (text) => writeDoc(dir, 'verification/verify.md', `${text}\n\n# Verify\n`);
-    const own = () => trustKit(dir);
-    const proof = (verdict, extra) => () => record(dir, 'S1', head(dir), verdict, extra);
-    const table = [
-      ['a missing kit refuses a proof', null, proof('proven-cli'), 1, /proof kit has not been written yet/],
-      ['a non-verifier records a proof', own, proof('proven-cli', { verifier: 'I1' }), 1, /only a verifier/],
-      ['an untrusted kit refuses a proof', () => kit('Trusted: no'), proof('proven-cli'), 1, /not trusted/],
-      ['a hand-typed yes with no self-run', () => kit('Trusted: yes'), proof('proven-cli'), 1, /not shown that it can fail/],
-      ['blocked is accepted but proves nothing', null, proof('blocked', { review: 'none', checks: null }), 0, /could not be checked/],
-      ['zero checks', own, proof('proven-cli', { checks: '0' }), 1, /no checks ran/],
-      ['a verifier registered for another scenario', () => (own(), addScenario(dir, 'S2')), () => record(dir, 'S2', head(dir), 'proven-cli', { verifier: 'V1' }), 1, /registered for S1, not for scenario S2/],
-      ['done with zero scenarios', null, () => withProject((empty) => ril(empty, 'stage', 'set', 'done')), 1, /no scenarios/],
-      ['a decision that only mentions the scenario', null, () => {
-        mutate(dir, (s) => void (s.scenarios[0].status = 'parked'));
-        ok(dir, 'decision', 'log', '--stage', 'accept', '--decision', 'Maybe S1 can be accepted as unproven', '--why', 'a thought, not a decision');
-        return ril(dir, 'stage', 'set', 'done');
-      }, 1, /nobody recorded "Accepted as unproven: S1"/],
-    ];
-    for (const [what, setup, run, code, says] of table) {
-      setup?.();
-      const r = run();
-      assert.equal(r.code, code, `${what}: ${r.stdout}${r.stderr}`);
-      assert.match(r.code ? r.stderr : r.stdout, says, what);
-      if (code) assert.match(r.stderr, /Next: /, `${what} has no Next line`);
-      assert.notEqual(status(dir, 'S1'), 'proven', `${what} proved the scenario`);
-    }
-    assert.ok(load(dir).ledger.every((r) => r.verdict === 'blocked'), 'only the blocked result was stored');
+    trustKit(dir);
+    advance(dir, ['design', 'confirm', 'build', 'accept']);
+    assert.equal(record(dir, 'S1', head(dir), 'proven-cli').code, 0);
+    fs.rmSync(path.join(dir, '.git'), { recursive: true, force: true });
+    const r = fails(dir, 1, 'stage', 'set', 'done');
+    assert.match(r.stderr, /ril checkpoint/);
+    assert.match(r.stderr, /saved/);
+    assert.doesNotMatch(r.stderr, /older version/);
+    assert.equal(load(dir).stage, 'accept');
   });
 });

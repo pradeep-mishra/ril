@@ -101,10 +101,11 @@ test('line ends are LF everywhere except the CRLF fixture', () => {
   assert.ok(attributes.includes('tests/fixtures/spec-crlf.md -text'), 'the CRLF fixture keeps its bytes');
 });
 
-test('every file under lib/ and bin/ is at most 300 lines, and there are at most 20 command files', () => {
-  const big = [...walk(path.join(repoRoot, 'lib')), ...walk(path.join(repoRoot, 'bin'))].filter((f) => lineCount(f) > 300);
+test('every file under lib/, bin/ and tests/ is at most 300 lines, and there are at most 20 command files', () => {
+  const files = [...walk(path.join(repoRoot, 'lib')), ...walk(path.join(repoRoot, 'bin')), ...walk(path.join(repoRoot, 'tests')).filter((f) => f.endsWith('.mjs'))];
+  const big = files.filter((f) => lineCount(f) > 300);
   assert.deepEqual(big.map((f) => path.relative(repoRoot, f)), [], 'files over 300 lines');
-  const commands = fs.readdirSync(path.join(repoRoot, 'lib', 'commands')).filter((n) => n.endsWith('.mjs') && n !== 'index.mjs');
+  const commands = fs.readdirSync(path.join(repoRoot, 'lib', 'commands')).filter((n) => n.endsWith('.mjs'));
   assert.ok(commands.length <= 20, `lib/commands has ${commands.length} command files, limit is 20`);
 });
 

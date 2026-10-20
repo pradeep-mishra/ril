@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { head, ok } from '../helpers/repo.mjs';
+import { ok } from '../helpers/repo.mjs';
 import { buildProject, docs, makeProject, ready, prove, runChecker, withProject } from '../helpers/lifecycle.mjs';
 import { tmpProject } from '../helpers/tmp.mjs';
 

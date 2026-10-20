@@ -7,8 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { tmpProject } from './tmp.mjs';
 import { git, gitInit, head, ok, record, register, trustKit } from './repo.mjs';
 
-export { trustKit };
-
 // A fresh git repo with a local identity, `ril init` already run (optionally with a fix-round cap) and one commit.
 // The caller calls cleanup().
 export function makeProject({ cap } = {}) {

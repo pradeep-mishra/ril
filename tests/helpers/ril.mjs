@@ -2,7 +2,8 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const entry = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'ril');
+export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+export const entry = path.join(repoRoot, 'bin', 'ril');
 
 // Runs the real entry (`node bin/ril`) with `dir` as the working folder; no shell involved.
 export function ril(dir, ...args) {
