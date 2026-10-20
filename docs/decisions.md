@@ -58,7 +58,7 @@ These rules are only an instruction to an agent, or nothing yet. A model that ig
 - The self-run: the CLI checks that two different non-empty evidence files exist, not that the first shows a failure and the second a pass; any agent can register a verifier and run `ril ledger selfrun`. The kit reviewer attacks the kit before the self-run; the CLI cannot read what evidence means.
 - A hand-written `selfruns` row in `state.json` fakes a self-run (state is not protected).
 - A project from before R2 whose kit says `Trusted: yes (<version>)` with no self-run row refuses new proven records until `ril ledger selfrun` is run.
-- `.ril/` stays out of git only through the repository's own exclude file (`ril init`, `ril checkpoint`): a clone does not share it, a `.ril` that was already tracked stays tracked, and the seal cannot see protected paths inside `.ril/`.
+- `.ril/` stays out of git only through the repository's own exclude file (`ril init`, `ril checkpoint`): a clone does not share it, the next `ril checkpoint` untracks a `.ril` that was already tracked, and the seal cannot see protected paths inside `.ril/`.
 - Evidence is not hashed, so a file can be changed after it was recorded.
 - Acceptances never expire.
 - The router rules, the rules read, retry, light and full review, plain language to the person, and risky actions never done silently.

@@ -104,5 +104,8 @@ test('.ril and Finder and Explorer files are excluded by init in a repo, and by 
     for (const name of ['.DS_Store', 'Thumbs.db', 'app.txt']) fs.writeFileSync(path.join(dir, name), 'x');
     assert.equal(ril(dir, 'checkpoint').code, 0);
     assert.equal(git(dir, 'ls-files', '--', '.ril', '.DS_Store', 'Thumbs.db', 'app.txt'), 'app.txt');
+    git(dir, 'add', '-f', '.ril');
+    assert.equal(ril(dir, 'checkpoint').code, 0);
+    assert.equal(git(dir, 'ls-files', '--', '.ril'), '', 'a tracked .ril is untracked by the next checkpoint');
   });
 });
