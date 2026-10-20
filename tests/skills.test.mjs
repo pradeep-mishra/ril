@@ -101,7 +101,7 @@ test('standing rules: at most 15 lines, ten rules, rules first', () => {
   assert.ok(f.lines <= 15, `${f.lines} lines`);
   assert.equal([...f.text.matchAll(/^\d+\. /gm)].length, 10);
   assert.match(f.text, /^1\. Read this file and `principles.md` first; if either is missing reply `STATUS: blocked`\./m);
-  assert.match(f.text, /only the verifier records a verdict/);
+  assert.match(f.text, /the verifier alone records a verdict/);
 });
 
 test('principles.md has 10 numbered items and at most 40 lines', () => {
@@ -130,11 +130,65 @@ test('ril-control keeps the retry, parallel and always-a-result rules', () => {
   assert.match(body, /`ril root`/);
 });
 
-test('front door handles a missing ril', () => {
+test('front door handles a missing ril, in all four cases', () => {
   const { body } = readSkill('ril');
   assert.match(body, /If `ril` cannot be run/);
   assert.match(body, /and stop/);
-  assert.match(body, /Node\.js 20/);
+  assert.match(body, /Node\.js is missing/, 'node missing');
+  assert.match(body, /`ril` is not found/, 'not found');
+  assert.match(body, /ahead of this one on your PATH/, 'shadowed on PATH');
+  assert.match(body, /chmod \+x/, 'not executable');
+  assert.match(body, /There is no ril project[^\n]*is not a missing `ril`/, 'no project is not a missing ril');
+});
+
+test('front door: init before doctor, never spawns', () => {
+  const { body } = readSkill('ril');
+  const init = body.indexOf('run `ril init` (do not run doctor first)');
+  const doctor = body.indexOf('Otherwise run `ril doctor --fix --quiet`');
+  assert.ok(init >= 0 && doctor > init, 'init rule must come before the doctor rule');
+  assert.match(body, /Never spawn an agent yourself/);
+});
+
+test('front door: skip, resume, confirm and catch-up details', () => {
+  const { body } = readSkill('ril');
+  assert.match(body, /`ril unit list` and `ril scenario list`/);
+  assert.match(body, /`--unit` or `--scenario`/);
+  assert.match(body, /Paused \(it was in the X stage\)/);
+  assert.match(body, /`ril progress "Caught the person up\."`/);
+  assert.match(body, /newer than the last/);
+  assert.match(body, /summarise `\.ril\/docs\/brief\.md` in plain words and tell them where to read it/);
+});
+
+test('standing rules let workers write their touch paths', () => {
+  const { text } = readFile('templates/standing-rules.md');
+  assert.match(text, /^3\. Never edit `\.ril\/state\.json`, its backups, the lock or the log/m);
+  assert.match(text, /Write only your own report and the paths in your brief's `touch` list/);
+  assert.doesNotMatch(text, /Never change anything under `\.ril\/`/);
+});
+
+test('ril-control: touch paths, report format, spawn failure, gate flags', () => {
+  const { body } = readSkill('ril-control');
+  assert.match(body, /document path or evidence folder[^\n]*`touch`/);
+  assert.match(body, /templates\/agent-report\.md[^\n]*`inputs`/);
+  assert.match(body, /--result "could not start"/);
+  assert.match(body, /back to `todo`/);
+  assert.match(body, /`ril gate park <id> --question "[^`]*" --options [^`]* --default [^`]*`/);
+  assert.match(body, /plain words/);
+  assert.match(body, /Never review a diff yourself/);
+  assert.match(body, /never resume/);
+});
+
+test('failed means could not do the job; findings and failed verdicts go to a fix round', () => {
+  const control = readSkill('ril-control').body;
+  assert.match(control, /`STATUS: failed` means the worker could not do its job/);
+  assert.match(control, /must-fix findings and a verifier's failed verdict go to the owning skill's fix round, never to a retry/);
+  assert.match(readRole('reviewer').body, /`STATUS: done` with the findings in RESULT/);
+  assert.match(readRole('verifier').body, /`STATUS: done` with the verdict in RESULT/);
+  for (const r of roles()) {
+    assert.match(r.body, /`STATUS: failed` only if you could not/, r.file);
+    assert.match(r.body, /agent-report file in your inputs/, r.file);
+  }
+  assert.match(readRole('verifier').body, /`--review` comes from the reviewer's report in your `inputs`/);
 });
 
 test('front door reconciles first and catches the person up', () => {
