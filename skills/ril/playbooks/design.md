@@ -9,7 +9,7 @@ Goal: before any code, the person reads a one-page brief and says "go". Takes sp
 - **Tools**, `.ril/tools.json`: `requires` (each with `name`, `detect` as `<program> <version-flag>`, `guide`, `reason`, optional `install`; `human` for what only the person can do), `allow` patterns inside the project, `humanSteps`; then `ril preflight`.
 - **Kit**: `skills/ril/playbooks/prove.md` writes it; `ril scenario coverage` exits 0.
 - **Look**: visual surfaces, `skills/ril/playbooks/prototype.md`, before the brief.
-- **Plans**, by an author, `.ril/docs/plans/plan-<n>.md`: plan 1 a walking skeleton proving one scenario; later plans vertical slices; every scenario in a plan. `ril unit add plan-<n> --kind plan --title "<title>"`.
+- **Plans**, by an author, `.ril/docs/plans/plan-<n>.md`: plan 1 a walking skeleton proving one scenario; later plans vertical slices; every scenario in a plan; each fits one worker. `ril unit add plan-<n> --kind plan --title "<title>"`.
 - Light review of each document before the next (plans together). Guided: sign-offs on design and plan list.
 - **Brief**, by an author, `.ril/docs/brief.md` from `templates/project-brief.md`, reviewed against the spec. `ril stage set confirm`.
 - **Confirm.** Show the brief plainly. "Tools I will use" and "What I can prove on this machine" are ONE question. On yes: `ril decision log --stage design --decision "Approved tools <hash>" --why "<their words>"` (from `ril preflight`), then `ril allowlist write --approved --tool claude`. Missing tools: install if pre-approved, else ask: install or guide. Steps only the person can do happen now, then `ril preflight` again.
