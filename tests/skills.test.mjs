@@ -11,11 +11,11 @@ import { headings, helpGroups, readFile, repoRoot, rilCommandsIn } from './helpe
 // Structure only: the shape of the router, playbooks, worker files and templates, and that what they name exists. Wording is not pinned.
 const BUDGETS = {
   'skills/ril/SKILL.md': 1200, 'skills/ril/playbooks/shape.md': 300, 'skills/ril/playbooks/design.md': 450, 'skills/ril/playbooks/accept.md': 250,
-  'skills/ril/playbooks/build.md': 400, 'skills/ril/playbooks/prove.md': 450, 'skills/ril/references/review.md': 300,
+  'skills/ril/playbooks/build.md': 400, 'skills/ril/playbooks/prove.md': 450, 'skills/ril/playbooks/prototype.md': 300, 'skills/ril/references/review.md': 300,
   'skills/ril/references/proof-kit.md': 500, 'skills/ril/worker-rules.md': 400, 'agents/ril-agent.md': 80, 'principles.md': 120,
 };
 const TEMPLATES = ['agent-brief', 'agent-report', 'spec', 'project-brief', 'feature-map', 'stop-report', 'verify', 'final-report'].map((n) => `templates/${n}.md`);
-const PLAYBOOKS = ['shape', 'design', 'accept', 'build', 'prove'].map((n) => `skills/ril/playbooks/${n}.md`);
+const PLAYBOOKS = ['shape', 'design', 'accept', 'build', 'prove', 'prototype'].map((n) => `skills/ril/playbooks/${n}.md`);
 const words = (file) => readFile(file).text.split(/\s+/).filter(Boolean).length;
 const keys = (text, re) => [...text.matchAll(re)].map((m) => m[1]);
 const inTempProject = (fn) => {
