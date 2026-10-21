@@ -76,7 +76,10 @@ test('brief shape problems: duplicate field, inline list value, unknown unit, a 
     assert.match(inline.stderr, /touch.*must be a list/);
     const nowhere = reg('V1', writeBrief(dir, 'verifier', (t) => t.replace('unit: S1', 'unit: S99')));
     assert.equal(nowhere.code, 6);
-    assert.match(nowhere.stderr, /S99/);
+    assert.match(nowhere.stderr, /S99.*ril unit list.*ril scenario list.*shape, design, confirm/s, 'the message says what a unit may be');
+    const given = reg('V1', fixture('agent-brief-good.md'), '--unit', 'S99');
+    assert.equal(given.code, 2);
+    assert.match(given.stderr, /ril unit list.*ril scenario list.*shape, design, confirm/s);
     assert.deepEqual(load(dir).agents, []);
 
     assert.equal(reg('V1', fixture('agent-brief-good.md')).code, 0);

@@ -57,7 +57,7 @@ Mark each one in the run log once you have seen it work.
 - Typing `/ril` in an interactive session. The spike only measured it with `claude -p`.
 - Whether allowlist entries written into the project settings in the middle of a session take effect without a restart (the gate above).
 - Workers edit product files without a prompt (the `Edit(./**)` allow rule), also when Claude Code was started from a subfolder of the project.
-- The deny rules really block a worker from editing `.ril/state.json`: try asking a worker to edit .ril/state.json with the Edit tool and confirm it is refused; note that a `node` command could still write it (the deny rules stop accidents, not a determined agent).
+- The deny rule really blocks a worker from editing `.claude/settings.json`: ask a worker to edit it with the Edit tool and confirm it is refused. With Claude Code's sandbox on, `ril init`, `ril agent register` and `git commit` still work (no deny on `.ril` or `.git`), and `ril allowlist write` says plainly that the sandbox blocks the settings file and what to do.
 - The git identity guide works in a new folder on a machine without a global git identity: `git init` and the project-local `git config user.name` and `git config user.email` lines let `ril checkpoint` save.
 - The Windows launcher `bin/ril.cmd`.
 - A first real install of the plugin, and whether a bare `ril` works from the shell afterwards.

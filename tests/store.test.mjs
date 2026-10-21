@@ -214,6 +214,14 @@ test('withLock retries through brief Windows-style open errors', () => {
   });
 });
 
+test('a lock file that cannot be created blames the sandbox for a refused write only', () => {
+  inTmp((dir) => {
+    const next = (code) => { try { withLock(dir, () => {}, { open: fail(code) }); } catch (e) { return e instanceof RilError && /could not create its lock file/.test(e.plain) ? e.next : assert.fail(e.message); } };
+    assert.match(next('EPERM'), /sandbox/);
+    assert.doesNotMatch(next('EROFS'), /sandbox/);
+  });
+});
+
 test('withLock in a folder with no .ril asks for ril init', () => {
   inTmp((dir) => {
     fs.rmSync(path.join(dir, '.ril'), { recursive: true });
