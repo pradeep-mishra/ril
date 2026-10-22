@@ -7,7 +7,7 @@ Goal: every scenario proven on the real product at the current saved version, by
 - A reviewer attacks the kit against the spec first (`skills/ril/references/review.md`).
 
 ## Trust the kit (the pilot's first build)
-- A verifier runs the kit, then makes one deliberate break, in a throwaway copy, of what one check covers: that check fails; undone, it passes. Both runs saved under `.ril/evidence/kit/<saved version>/`.
+- A verifier runs the kit (its one red run of real-app checks), then makes one deliberate break, in a throwaway copy, of what one check covers: that check fails; undone, it passes. Both runs saved under `.ril/evidence/kit/<saved version>/`.
 - It runs `ril ledger selfrun <saved version> --break <file> --restored <file> --verifier <agent id>` and sets line 1 to `Trusted: yes (<saved version>)`. A changed kit needs a new self-run.
 
 ## Drift check (after a stop, and each plan after the first)
@@ -21,7 +21,6 @@ Goal: every scenario proven on the real product at the current saved version, by
 ## Fix loop
 - `failed`: `ril round bump <scenario>`, a fresh fixer with the verdict, `ril checkpoint`, the reviewer, fresh verifiers for the plan's scenarios. Exit 4: cap, stop report.
 - Failed self-run: weak check to a tester, wrong kit step to an author, a product that will not start to a fixer.
-- `blocked` on protected files: a fresh tester restores them.
 - All proven or set aside: `ril unit set <id> --state verified --checkpoint <V>` for the plan and each task.
 
 ## Evidence required for done

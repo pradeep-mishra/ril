@@ -9,7 +9,7 @@ Goal: the whole product proven again at one saved version, with a README and an 
 - A full review of the whole running product (`skills/ril/references/review.md`; prove reuses this reviewer's reply); its acceptance adds a scan of committed files for secrets, and a committed secret is must-fix.
 - Then `skills/ril/playbooks/prove.md` at that saved version: one fresh verifier per scenario not set aside, none that verified it before, installing and running it by the README. A failure goes through the fix loop, then back to the review.
 - An author writes `.ril/docs/reports/final.md` from `templates/final-report.md`.
-- `ril stage set done`. Point the person to the report; the steps are in it.
+- `ril stage set done`. Point the person to the report.
 
 ## Evidence required for done
 

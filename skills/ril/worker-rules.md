@@ -11,6 +11,7 @@
 7. No new dependency or tool unless the brief or the approved list names it.
 8. Stop at what the brief's `stop` names and before anything risky or irreversible; say so.
 9. Label each claim measured, inferred or guess.
+10. Never launch a real window or app, or send keys outside your own windows, unless the brief says so; never loop launch and quit; clean up what you started. Briefs copy the logged "Real-app runs" decision into `acceptance`.
 
 ## Role contracts
 

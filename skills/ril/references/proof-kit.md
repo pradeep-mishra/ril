@@ -18,17 +18,18 @@ The label says how a scenario is observed, not what the product is. Drive every 
 
 ## Kit rules
 
-1. **Clean starting state**, defined by the kit (data stores, devices, accounts, settings, caches) and recreated every run. Never the person's own data.
-2. **Launch it as a person gets it**: built, installed or served as released, in a throwaway place outside the project.
+1. **Clean starting state**, defined by the kit (data stores, devices, accounts, settings, caches) and recreated every run. Never the person's data, real settings or home folder: use a throwaway one.
+2. **Launch it as a person gets it**: built, installed or served as released, outside the project.
 3. **Doctor**: after a stop, it starts, the verify command counts above zero, each driver answers.
-4. **Drive every way a person can reach the feature.** Never weaken the journey: no hidden route, internal call or state a person could not create.
+4. **Drive every way a person can reach the feature**: no hidden route, internal call or state a person could not create.
 5. **Evidence is what was observed**: verbatim, never tidied or retyped, non-empty, under `.ril/evidence/<id>/<saved version>/`. Zero checks or a gap is never a pass.
-6. **Cleanup keeps the evidence** and removes everything else.
+6. **Cleanup keeps the evidence** and removes everything else, leaving nothing in the person's folders.
 7. **One verify command** reruns every automated check and prints the count. A drop while the feature map did not shrink is a failure.
-8. **Name every stand-in** (simulator, test account, sandbox, sample) and list what it left unproven under `## Not covered`.
+8. **Name every stand-in** and list what it left unproven under `## Not covered`.
 9. **No approved driver:** get one approved first; only then ask the person to observe, and label that evidence theirs.
-10. **Pin what makes proofs lie**: leftovers, personal settings, clocks, randomness, network.
-11. **Taste is not a pass**: split "feels right" into checkable parts; screenshots go to the person.
+10. **Pin what makes proofs lie**: leftovers, clocks, randomness, network.
+11. **Real-app runs**: use the least intrusive driver (a separate display or session, a simulator, a hidden window); say in "What I can prove on this machine" if only an intrusive one exists. They run red once, in the kit's self-run, then per the logged choice: batched = one batch after each task's implementer and one per plan for the proofs, a batch being ONE launch running all its checks in sequence; at the end = only in accept; as they come = per check.
+12. **Taste is not a pass**: split "feels right" into checkable parts; screenshots go to the person.
 
 ## Break-it pass
 
@@ -36,8 +37,4 @@ After the happy path: bad or boundary input, empty state, the same action twice,
 
 ## Attack questions
 
-Asked of every kit and every run:
-- Could this pass while the product is broken?
-- Does it observe through the person's surface or through internals?
-- Is an expected value produced by the code under test?
-- Would a deliberate break turn it red?
+The review guide's questions, plus: is an expected value produced by the code under test? Would a deliberate break turn it red?
