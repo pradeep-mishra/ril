@@ -18,5 +18,5 @@ Goal: a reviewed spec of provable scenarios and an intake of the person's words,
 ## Evidence required for done
 
 - `ril scenario list` shows every spec scenario; the intake is complete.
-- The last review left no must-fix, or each is an accepted risk; guided: signed off.
+- The last review is clean or its risks accepted; guided: signed off.
 - `ril stage get` says design.

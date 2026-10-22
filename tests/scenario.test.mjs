@@ -34,7 +34,7 @@ test('scenario import good spec', () => {
   }
 });
 
-test('scenario import bad spec exits 6, one line per problem, adds nothing', () => {
+test('scenario import bad spec exits 6, one line per problem, adds nothing; a duplicate id is one problem', () => {
   withProject((dir) => {
     for (const extra of [[], ['--check']]) {
       const r = fails(dir, 6, 'scenario', 'import', fixture('spec-bad.md'), ...extra);
@@ -45,6 +45,14 @@ test('scenario import bad spec exits 6, one line per problem, adds nothing', () 
       assert.match(r.stderr, /Next: /);
     }
     assert.deepEqual(load(dir).scenarios, [], 'the good scenario S1 is not added either');
+    const dup = path.join(dir, 'dup.md'); // a duplicate id is one problem; a colon in a title is kept
+    fs.writeFileSync(dup, '### S1: One\nCriterion: a\nProof: cli\n\n### S1: Again\nCriterion: b\nProof: cli\n');
+    const d = fails(dir, 6, 'scenario', 'import', dup);
+    assert.match(lines(d.stderr).filter((l) => !l.startsWith('Next:')).join('\n'), /^S1.*more than once/);
+    assert.deepEqual(load(dir).scenarios, []);
+    fs.writeFileSync(dup, '### S1: Add: a task, quickly\nCriterion: Run it: it works.\nProof: cli\n');
+    ok(dir, 'scenario', 'import', dup);
+    assert.deepEqual([load(dir).scenarios[0].title, load(dir).scenarios[0].criterion], ['Add: a task, quickly', 'Run it: it works.']);
   });
 });
 
@@ -79,7 +87,7 @@ test('scenario add idempotent and conflicting', () => {
   });
 });
 
-test('scenario update while unproven, list and json', () => {
+test('scenario update while unproven, an empty value, list and json', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');
     ok(dir, 'scenario', 'update', 'S1', '--criterion', 'new words', '--method', 'api');
@@ -91,6 +99,10 @@ test('scenario update while unproven, list and json', () => {
     assert.equal(JSON.parse(ok(dir, '--json', 'scenario', 'list').stdout)[0].id, 'S1');
     fails(dir, 2, 'scenario', 'update', 'S9', '--title', 'x');
     fails(dir, 1, 'scenario', 'update', 'S1');
+    for (const opt of ['--criterion', '--title', '--method']) {
+      assert.match(fails(dir, 1, 'scenario', 'update', 'S1', opt, '  ').stderr, /Next: /, opt);
+    }
+    assert.equal(load(dir).scenarios[0].criterion, 'new words');
   });
 });
 
@@ -163,16 +175,6 @@ test('one reason covers both a tried scenario and the freeze after confirm, logg
   });
 });
 
-test('scenario update refuses an empty title or criterion', () => {
-  withProject((dir) => {
-    addScenario(dir, 'S1');
-    for (const opt of ['--criterion', '--title', '--method']) {
-      assert.match(fails(dir, 1, 'scenario', 'update', 'S1', opt, '  ').stderr, /Next: /, opt);
-    }
-    assert.equal(load(dir).scenarios[0].criterion, 'Criterion S1');
-  });
-});
-
 test('scenario coverage reports a missing feature map and passes when it exists', () => {
   withProject((dir) => {
     assert.match(ok(dir, 'scenario', 'coverage').stdout, /no scenarios/i);
@@ -195,7 +197,7 @@ test('scenario coverage reports a missing feature map and passes when it exists'
   });
 });
 
-test('a spec file and a feature map that start with a byte order mark still work', () => {
+test('a byte order mark in a spec or feature map still works, and a wrapped criterion is kept whole', () => {
   withProject((dir) => {
     const spec = path.join(dir, 'bom.md');
     fs.writeFileSync(spec, '\uFEFF### S1: A\nCriterion: c\nProof: cli\n\n### S2: B\nCriterion: d\nProof: cli\n\n### S3: C\nCriterion: e\nProof: cli\n');
@@ -206,10 +208,7 @@ test('a spec file and a feature map that start with a byte order mark still work
     for (const id of ['S1', 'S2', 'S3']) fs.writeFileSync(path.join(mapDir, `${id}.md`), '﻿Method: cli  \r\nmore\r\n');
     ok(dir, 'scenario', 'coverage');
   });
-});
-
-test('a criterion that wraps onto the next lines is kept whole', () => {
-  withProject((dir) => {
+  withProject((dir) => { // a criterion that wraps onto the next lines is kept whole
     const spec = path.join(dir, 'wrap.md');
     fs.writeFileSync(spec, [
       '### S1: Wrapped',
@@ -231,24 +230,6 @@ test('a criterion that wraps onto the next lines is kept whole', () => {
     assert.equal(s1.criterion, 'The list command shows every open task, oldest first.');
     assert.equal(s1.method, 'cli');
     assert.equal(s2.criterion, 'First line');
-  });
-});
-
-test('a duplicate id in one spec is one problem and nothing is added; a colon in a title is kept', () => {
-  withProject((dir) => {
-    const dup = path.join(dir, 'dup.md');
-    fs.writeFileSync(dup, '### S1: One\nCriterion: a\nProof: cli\n\n### S1: Again\nCriterion: b\nProof: cli\n');
-    const r = fails(dir, 6, 'scenario', 'import', dup);
-    const problems = lines(r.stderr).filter((l) => !l.startsWith('Next:'));
-    assert.equal(problems.length, 1, r.stderr);
-    assert.match(problems[0], /S1.*more than once/);
-    assert.deepEqual(load(dir).scenarios, []);
-
-    const colon = path.join(dir, 'colon.md');
-    fs.writeFileSync(colon, '### S1: Add: a task, quickly\nCriterion: Run it: it works.\nProof: cli\n');
-    ok(dir, 'scenario', 'import', colon);
-    const s = load(dir).scenarios[0];
-    assert.deepEqual([s.title, s.criterion], ['Add: a task, quickly', 'Run it: it works.']);
   });
 });
 

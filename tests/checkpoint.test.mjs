@@ -65,11 +65,12 @@ test('checkpoint in a project nested in a larger repo saves only the project', (
     assert.equal(head(outer), first);
 
     fs.writeFileSync(path.join(dir, 'a.js'), 'code\n');
+    assert.match(fails(dir, 1, 'checkpoint').stderr, /outside this project folder is staged/);
+    assert.equal(head(outer), first, 'a staged outside change is refused, never saved');
+    git(outer, 'reset', '-q');
     const second = ok(dir, 'checkpoint').stdout.trim();
-    assert.notEqual(second, first);
-    const saved = lines(git(outer, 'show', '--name-only', '--format=', second));
-    assert.deepEqual(saved, ['app/a.js']);
-    assert.match(git(outer, 'status', '--porcelain'), /^A {2}outside\.txt/m, 'the outside file is still only staged');
+    assert.deepEqual(lines(git(outer, 'show', '--name-only', '--format=', second)), ['app/a.js']);
+    assert.match(git(outer, 'status', '--porcelain'), /\?\? outside\.txt/, 'the outside file is not saved');
   } finally {
     fs.rmSync(outer, { recursive: true, force: true });
   }
@@ -107,5 +108,28 @@ test('.ril and Finder and Explorer files are excluded by init in a repo, and by 
     git(dir, 'add', '-f', '.ril');
     assert.equal(ril(dir, 'checkpoint').code, 0);
     assert.equal(git(dir, 'ls-files', '--', '.ril'), '', 'a tracked .ril is untracked by the next checkpoint');
+    git(dir, 'add', '-f', '.ril');
+    git(dir, 'commit', '-q', '-m', 'old project with .ril saved');
+    assert.equal(ril(dir, 'checkpoint').code, 0);
+    assert.equal(git(dir, 'ls-files', '--', '.ril'), '', 'a .ril saved in an earlier version is untracked too');
+    assert.ok(fs.existsSync(path.join(dir, '.ril', 'docs')), '.ril is still on disk');
+  });
+});
+
+test('a file saved earlier, then ignored and removed from tracking, stays out of the next checkpoint', () => {
+  withRepo((dir) => {
+    fs.mkdirSync(path.join(dir, 'dist'));
+    fs.writeFileSync(path.join(dir, 'dist', 'out.js'), 'built\n');
+    fs.writeFileSync(path.join(dir, 'app.js'), 'v1\n');
+    ok(dir, 'checkpoint');
+    assert.ok(lines(git(dir, 'ls-files')).includes('dist/out.js'));
+    fs.writeFileSync(path.join(dir, '.gitignore'), 'dist/\n');
+    git(dir, 'rm', '-r', '--cached', '-q', 'dist');
+    fs.writeFileSync(path.join(dir, 'app.js'), 'v2\n');
+    const second = ok(dir, 'checkpoint').stdout.trim();
+    assert.deepEqual(lines(git(dir, 'ls-tree', '-r', '--name-only', second, '--', 'dist')), []);
+    assert.equal(git(dir, 'show', `${second}:app.js`), 'v2');
+    assert.ok(fs.existsSync(path.join(dir, 'dist', 'out.js')), 'the file is still on disk');
+    assert.equal(git(dir, 'status', '--porcelain'), '');
   });
 });

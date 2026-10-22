@@ -17,7 +17,7 @@ const END = '<!-- ril:managed:end -->';
 const LINE =
   'This project is managed by RIL. For any request about this project (continue, fix, change, status), start with the RIL front door (/ril); it re-reads .ril/ state.';
 
-test('init creates state, folders and the routing blocks', () => {
+test('init creates state, folders and the routing blocks, takes a name and a mode, and rejects a bad mode', () => {
   withProject((dir) => {
     const state = JSON.parse(fs.readFileSync(statePath(dir), 'utf8'));
     assert.equal(state.version, 1);
@@ -28,14 +28,7 @@ test('init creates state, folders and the routing blocks', () => {
     assert.ok(fs.existsSync(path.join(dir, '.ril', 'log.md')));
     for (const f of ['CLAUDE.md', 'AGENTS.md']) assert.equal(fs.readFileSync(path.join(dir, f), 'utf8'), `${START}\n${LINE}\n${END}\n`, f);
   });
-});
-
-test('init takes a name and a mode, and rejects a bad mode', () => {
-  withProject((dir) => {
-    const s = load(dir);
-    assert.equal(s.project, 'Shop');
-    assert.equal(s.mode, 'guided');
-  }, '--name', 'Shop', '--mode', 'guided');
+  withProject((dir) => assert.deepEqual([load(dir).project, load(dir).mode], ['Shop', 'guided']), '--name', 'Shop', '--mode', 'guided');
   inFolder((dir) => {
     const r = ril(dir, 'init', '--mode', 'loose');
     assert.equal(r.code, 1);
@@ -44,7 +37,7 @@ test('init takes a name and a mode, and rejects a bad mode', () => {
   });
 });
 
-test('init is idempotent', () => {
+test('init is idempotent, and a repeat repairs the block, the folders and the plugin root', () => {
   withProject((dir) => {
     mutate(dir, (s) => s.decisions.push({ ts: 't', stage: s.stage, decision: 'keep me', why: 'test' }));
     const stateBefore = fs.readFileSync(statePath(dir), 'utf8');
@@ -55,11 +48,7 @@ test('init is idempotent', () => {
     assert.equal(fs.readFileSync(statePath(dir), 'utf8'), stateBefore);
     assert.equal(fs.readFileSync(`${statePath(dir)}.bak`, 'utf8'), backupBefore, 'no state write happened');
     assert.equal(JSON.parse(ril(dir, 'init', '--json').stdout).created, false);
-  });
-});
-
-test('init repairs the block, the folders and the plugin root', () => {
-  withProject((dir) => {
+    // and a repeat repairs the block, the folders and the plugin root
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), `${START}\nwrong\n${END}\n`);
     fs.rmSync(path.join(dir, '.ril', 'evidence'), { recursive: true });
     mutate(dir, (s) => void (s.pluginRoot = '/somewhere/old'));

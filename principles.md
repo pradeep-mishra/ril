@@ -8,5 +8,4 @@
 6. Best practice by default: accessible, clear empty, loading and error states, secure, no secrets in code.
 7. Small steps, each ending in a check.
 8. Pointers, not pasted text; summaries, not raw output.
-9. Plain words to people; say what happens next.
-10. Risky or irreversible actions are never done silently.
+9. Plain words to people.

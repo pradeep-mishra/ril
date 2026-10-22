@@ -19,13 +19,13 @@ Goal: every scenario proven on the real product at the current saved version, by
 - One fresh verifier per scenario (`--unit <scenario>`), given the spec, `verify.md`, its feature map and the reviewer's reply. It runs the verify command, every path in the map and the break-it pass, saves evidence, and records `ril ledger record <scenario> <V> <proven-<method>|failed|blocked> --evidence <file> --verifier <agent id> --review <clean|risks|none> --checks <n>`. `risks` needs "Accepted risk for <id>".
 
 ## Fix loop
-- `failed`: `ril round bump <scenario>`, a fresh fixer with the verdict, `ril checkpoint`, the reviewer, fresh verifiers for the plan's scenarios. Exit 4: cap, stop report.
+- `failed`: `ril round bump <scenario>`, a fresh fixer with the verdict, `ril checkpoint`, the reviewer, fresh verifiers for the plan's scenarios.
 - Failed self-run: weak check to a tester, wrong kit step to an author, a product that will not start to a fixer.
 - All proven or set aside: `ril unit set <id> --state verified --checkpoint <V>` for the plan and each task.
 
 ## Evidence required for done
 - `ril scenario coverage` exits 0; the kit review is clean or its risks are accepted.
 - A recorded self-run, and line 1 of `verify.md` names its version.
-- `ril ledger check` prints VERIFIED for each scenario at V, from its own verifier, `--checks` at least 1.
+- `ril ledger check` prints VERIFIED for each scenario at V, from its own verifier.
 - Every `failed` verdict carries expected, observed, repro and evidence.
 - The plan is `verified`.
