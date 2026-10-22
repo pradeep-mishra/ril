@@ -122,7 +122,7 @@ test('recovery path: a working agent with no report is stopped in a new session 
     const unit = () => load(dir).units.find((u) => u.id === 'U1').state;
 
     ok(dir, 'doctor', '--fix', '--quiet');
-    assert.equal(agent('I1').state, 'running', 'a young agent is left alone in the same session');
+    assert.equal(agent('I1').state, 'registered', 'a young agent is left alone in the same session');
     assert.equal(unit(), 'doing');
     assert.match(ok(dir, 'doctor', '--fix', '--new-session').stdout, /I1/);
     assert.equal(agent('I1').state, 'stopped');

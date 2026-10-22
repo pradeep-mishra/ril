@@ -126,6 +126,7 @@ const variants = [
     }
   }), /No scenario is proven/],
   ['an agent is still working', (dir) => edit(dir, (s) => void (s.agents[0].state = 'running')), /still marked as working/],
+  ['an agent was registered and never started', (dir) => edit(dir, (s) => void (s.agents[0].state = 'registered')), /still marked as working \(registered\)/],
   ['the verifier is not a verifier', (dir) => edit(dir, (s) => void (s.agents[0].role = 'implementer')), /not a verifier/],
   ['a proof ran zero checks', (dir) => edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').checks = 0)), /ran 0 checks/],
   ['the review is none', (dir) => edit(dir, (s) => void (s.ledger.find((r) => r.scenario === 'S1').review = 'none')), /review of scenario S1 is none/],

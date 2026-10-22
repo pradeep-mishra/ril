@@ -93,7 +93,7 @@ try {
   if (dirty.status !== 0) fail('git could not say whether the project is clean.');
   else if (dirty.stdout.trim()) fail(`The project has unsaved changes:\n${dirty.stdout.trimEnd().split('\n').map((l) => `  ${l}`).join('\n')}`);
 
-  for (const a of state.agents.filter((x) => x?.state === 'running')) fail(`Agent ${a.id} (${a.role}) is still marked as working.`);
+  for (const a of state.agents.filter((x) => x?.state === 'running' || x?.state === 'registered')) fail(`Agent ${a.id} (${a.role}) is still marked as working (${a.state}).`);
 } catch (err) {
   cannot(`Could not check ${dir}: ${err.message}`);
 }

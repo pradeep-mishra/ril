@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { load } from '../lib/store.mjs';
+import { addAgent, agent } from './helpers/recovery.mjs';
 import { ril } from './helpers/ril.mjs';
 import { addScenario, fails, fixture, lines, ok, register, withRepo, writeBrief } from './helpers/repo.mjs';
 
@@ -36,11 +37,13 @@ test('register refuses unknown role and incomplete brief', () => {
     const [agent] = load(dir).agents;
     assert.equal(agent.id, 'V1');
     assert.equal(agent.role, 'verifier');
-    assert.equal(agent.state, 'running');
+    assert.equal(agent.state, 'registered', 'registering is not starting');
     assert.equal(agent.unit, 'S1', 'unit comes from the brief when --unit is not given');
+    assert.match(ok(dir, 'agent', 'list', '--active').stdout, /registered \(not started yet, \d+ min\)/);
+    ok(dir, 'agent', 'set', 'V1', '--state', 'running');
+    assert.equal(load(dir).agents[0].state, 'running');
 
     ok(dir, 'agent', 'set', 'V1', '--state', 'done', '--result', 'S1 proven');
-    assert.equal(load(dir).agents[0].state, 'done');
     assert.equal(load(dir).agents[0].result, 'S1 proven');
     fails(dir, 1, 'agent', 'set', 'V1', '--state', 'asleep');
     fails(dir, 2, 'agent', 'set', 'NOPE', '--state', 'done', '--result', 'finished');
@@ -98,12 +101,22 @@ test('a done or failed agent must say what it did, so its unit is not held forev
     for (const state of ['done', 'failed']) {
       const r = fails(dir, 1, 'agent', 'set', 'V1', '--state', state);
       assert.match(r.stderr, /--result/);
-      assert.equal(load(dir).agents[0].state, 'running', 'nothing changed');
+      assert.equal(load(dir).agents[0].state, 'registered', 'nothing changed');
       fails(dir, 1, 'agent', 'set', 'V1', '--state', state, '--result', '  ');
     }
     ok(dir, 'agent', 'set', 'V1', '--state', 'stopped');
-    ok(dir, 'agent', 'set', 'V1', '--state', 'running');
     ok(dir, 'agent', 'set', 'V1', '--state', 'failed', '--result', 'could not start the app');
     assert.equal(load(dir).agents[0].result, 'could not start the app');
+  });
+});
+
+test('doctor stops a registered agent after 5 minutes as never started; an old running agent stays valid', () => {
+  withRepo((dir) => {
+    for (const [id, minutes, state] of [['A1', 6, 'registered'], ['A2', 4, 'registered'], ['A3', 1, 'running']]) addAgent(dir, id, { unit: 'S9', minutes, state });
+    assert.match(fails(dir, 1, 'doctor').stdout, /registered but never started: A1/);
+    ok(dir, 'doctor', '--fix');
+    assert.deepEqual(['A1', 'A2', 'A3'].map((id) => agent(dir, id).state), ['stopped', 'registered', 'running']);
+    ok(dir, 'doctor', '--fix', '--new-session');
+    assert.deepEqual(['A1', 'A2'].map((id) => agent(dir, id).result), ['never started', 'never started']);
   });
 });
