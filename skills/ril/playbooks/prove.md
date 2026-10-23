@@ -8,7 +8,7 @@ Goal: every scenario proven on the real product at the current saved version, by
 
 ## Trust the kit (the pilot's first build)
 - A verifier runs the kit (its one red run of real-app checks), then makes one deliberate break, in a throwaway copy, of what one check covers: that check fails; undone, it passes. Both runs saved under `.ril/evidence/kit/<saved version>/`.
-- It runs `ril ledger selfrun <saved version> --break <file> --restored <file> --verifier <agent id>` and sets line 1 to `Trusted: yes (<saved version>)`. A changed kit needs a new self-run.
+- It runs `ril ledger selfrun <saved version> --break <file> --restored <file> --verifier <agent id>` and sets line 1 to `Trusted: yes (<saved version>)`.
 
 ## Drift check (after a stop, and each plan after the first)
 - One verifier registered for the current plan unit reruns the kit's Doctor check, the verify command and every proven scenario's drive, recording nothing and changing nothing in the kit folder.
@@ -16,7 +16,7 @@ Goal: every scenario proven on the real product at the current saved version, by
 
 ## Verify (each plan, and accept)
 - At saved version V, first a full review of the running product.
-- One fresh verifier per scenario (`--unit <scenario>`), given the spec, `verify.md`, its feature map and the reviewer's reply. It runs the verify command, every path in the map and the break-it pass, saves evidence, and records `ril ledger record <scenario> <V> <proven-<method>|failed|blocked> --evidence <file> --verifier <agent id> --review <clean|risks|none> --checks <n>`. `risks` needs "Accepted risk for <id>".
+- One fresh verifier per scenario (`--unit <scenario>`), given the spec, `verify.md`, its feature map and the reviewer's reply. It runs the verify command, every path in the map and the break-it pass, saves evidence, and records `ril ledger record <scenario> <V> <proven-<method>|failed|blocked> --evidence <file> --verifier <agent id> --review <clean|risks|none> --checks <n>`.
 
 ## Fix loop
 - `failed`: `ril round bump <scenario>`, a fresh fixer with the verdict, `ril checkpoint`, the reviewer, fresh verifiers for the plan's scenarios.
@@ -27,5 +27,4 @@ Goal: every scenario proven on the real product at the current saved version, by
 - `ril scenario coverage` exits 0; the kit review is clean or its risks are accepted.
 - A recorded self-run, and line 1 of `verify.md` names its version.
 - `ril ledger check` prints VERIFIED for each scenario at V, from its own verifier.
-- Every `failed` verdict carries expected, observed, repro and evidence.
 - The plan is `verified`.

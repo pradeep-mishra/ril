@@ -1,6 +1,6 @@
 # Review guide
 
-A fresh reviewer, never the author, attacks the artifact; it never edits.
+A fresh reviewer, never the author, attacks the artifact.
 
 ## Who reviews what
 
@@ -15,7 +15,7 @@ A fresh reviewer, never the author, attacks the artifact; it never edits.
 
 ## Rounds
 
-- Must-fix goes to a fresh author (documents) or fixer (code), then a fresh reviewer with the same inputs.
+- Must-fix goes to a fresh author (documents) or fixer (code), then a fresh reviewer.
 - At the cap (I8): the rest goes to one more fresh author or fixer with the findings, which fixes or disputes each. Only a disputed must-fix becomes an accepted risk: `ril decision log --stage <stage> --decision "Accepted risk for <id>: <finding>" --why "<the dispute>"`, one per affected scenario. Tell the person; guided asks first (`ril gate park review-<unit> ...`).
 
 ## Evidence required for done
