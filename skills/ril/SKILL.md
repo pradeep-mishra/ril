@@ -23,7 +23,7 @@ The idea becomes working software, every promise in its spec proven on the real 
 - Autonomous: you decide, log each choice made for the person (`ril decision log --stage <stage> --decision "<what>" --why "<why>"`), use the pre-approvals from intake, and stop only for the stop list.
 - Guided: the same, plus a sign-off on each stage's key document (`ril gate park signoff-<what> --question "<plain words>" --options "yes|change it" --default yes`).
 
-**Stop list** (ask first, unless pre-approved at intake): spending money; deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
+**Stop list** (ask first, unless pre-approved at intake): spending money; losing or deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
 
 **Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer's own fix rounds).
 1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
