@@ -1,7 +1,5 @@
 # Build
 
-Goal: each plan built test first, one task at a time, plans in order; its code survives a full review; a saved version goes to prove.
-
 ## Checks
 - **Which plan.** The first `plan-<n>` in `ril unit list --kind plan` not `verified` or `parked`. Start: `ril checkpoint`, then `ril unit set plan-<n> --state doing --checkpoint <id>`. Plans after the first start with prove's drift check. On resume, skip what exists; never rebuild a task `built` or later.
 - **Tasks.** An author writes `.ril/docs/plans/plan-<n>-tasks.md`: vertical slices, each with `Scenarios:`, `Files:` (at most 5), `Tests:`, `Run:` and `Expected:`, every scenario served. Light review, then `ril unit add plan-<n>-t<k> --kind task --parent plan-<n> --title "<title>"`.
@@ -14,7 +12,7 @@ Goal: each plan built test first, one task at a time, plans in order; its code s
   5. A task marked `Risk: high` in the tasks file (rails, security, money, data loss, concurrency, design.md's costly-bug places) gets a full review of its files now; others skip it.
   6. `ril unit set plan-<n>-t<k> --state built`.
 - **Review**, build's adversarial review: ONE full review of the plan's whole diff since its start, when its last task is built (`ril checkpoint` first), before prove's verifiers. It checks `git ls-files` for generated output; any found: fix `.gitignore`, `git rm -r --cached <path>`, `ril checkpoint`.
-- **Fix round.** Must-fix in code resumes the implementer that wrote it (same worker, same context): send the findings, `ril agent set <implementer id> --state running`, save each new reply as its own file (`report-2.md`, never overwriting), then done or failed again. The fix starts with a failing test; then `ril checkpoint` and a fresh reviewer, never the implementer. A protected-file finding goes to a fresh tester. If it cannot be resumed (stopped, lost in a crash with no newer reply file, host refuses): a fresh `fixer` with the brief and the previous replies. Documents keep fresh authors.
+- **Fix round**, for review findings and failed verdicts. A code must-fix, or a failed verdict that needs code changes, resumes the implementer that wrote it: send the findings, `ril agent set <implementer id> --state running`, save each new reply as its own file (`report-2.md`, never overwriting), then done or failed again. The fix starts with a failing test; then `ril checkpoint` and a fresh reviewer or verifier, never the implementer. A protected-file finding goes to a fresh tester. If it cannot be resumed (stopped, lost in a crash with no newer reply file, host refuses): a fresh `fixer` with the brief and the previous replies. Document findings go to a fresh author.
 - **Scope.** A task needing a file outside its `touch`, another scenario or a design change stops. Autonomous: a fresh author changes the tasks or plan, decision logged. Guided: ask first.
 
 ## Evidence required for done

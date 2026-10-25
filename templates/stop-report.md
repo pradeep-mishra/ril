@@ -1,4 +1,4 @@
-<!-- Plain words, no ids or commands; claims labelled measured, inferred or guess. Delete this line. -->
+<!-- Plain words, no ids or commands. Delete this line. -->
 # Stopped: <the promise>
 
 ## What works

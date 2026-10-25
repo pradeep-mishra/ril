@@ -1,6 +1,6 @@
 # Proof-kit guide
 
-For kit authors and verifiers. The kit is `.ril/docs/verification/verify.md` plus `.ril/docs/verification/feature-map/<id>.md` per scenario. You choose the method; this is the standard.
+You choose the method; this is the standard.
 
 ## Surface, driver, evidence
 
@@ -28,7 +28,7 @@ The label says how a scenario is observed, not what the product is. Drive every 
 8. **Name every stand-in** and list what it left unproven under `## Not covered`.
 9. **No approved driver:** get one approved first; only then ask the person to observe, and label that evidence theirs.
 10. **Pin what makes proofs lie**: leftovers, clocks, randomness, network.
-11. **Real-app runs**: use the least intrusive driver (a separate display or session, a simulator, a hidden window); if only an intrusive one exists, say so in "What I can prove on this machine". Red once, in the self-run, then per the logged choice: batched = ONE launch running all checks, after each task's implementer and once per plan for proofs; at the end = only in accept; as they come = per check.
+11. **Real-app runs**: use the least intrusive driver (a separate display or session, a simulator, a hidden window); if only an intrusive one exists, say so in "What I can prove on this machine". Red once, in the self-run, then per the logged choice. A batch is ONE window the controller announces in one plain line: verifiers run back to back inside it, never interleaved with other work; each launches the app at most once and runs ALL its scenario's real-app checks in that launch; the person steps away once. Batched = one window after each task's implementer and one per plan for the proofs; at the end = only in accept; as they come = per check.
 12. **Taste is not a pass**: split "feels right" into checkable parts; screenshots go to the person.
 
 ## Break-it pass

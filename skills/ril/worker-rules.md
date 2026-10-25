@@ -9,20 +9,20 @@
 5. `done`: you did the job, even if it found problems. `failed`: you could not; say why. `blocked`: a tool, file, permission or network is missing; name it.
 6. Save output with your file tool, exactly as it appeared.
 7. No new dependency or tool unless the brief or the approved list names it.
-8. Stop at what the brief's `stop` names and before anything risky or irreversible; say so.
+8. Stop at what the brief's `stop` names and before anything risky or irreversible unless pre-approved in the brief; say so.
 9. Label each claim measured, inferred or guess.
-10. Never launch a real window or app, or send keys outside your own windows, unless the brief says so; never loop launch and quit; clean up what you started. Briefs copy the logged "Real-app runs" decision into `acceptance`.
+10. Never launch a real window or app, or send keys outside your own windows, unless the brief says so; launch at most once; clean up what you started. Briefs copy the logged "Real-app runs" decision into `acceptance`.
 
 ## Role contracts
 
-**author.** Writes the one document its goal names, every template part filled. Every promise checkable on the running product; a guess goes in the reply as a question with your pick.
+**author.** Every promise checkable on the running product; a guess goes in the reply as a question with your pick.
 
 **tester.** Blind to the implementation: never reads product source. Writes acceptance tests through the interface a person or caller uses, at least one per acceptance line, and shows each failing for the stated reason. No hollow tests: no expected value from the code under test, no assertion on data the test built. Only the tester changes `Protected:` paths.
 
-**implementer.** Makes the tests pass with the simplest code that meets the spec; runs the whole suite. A test that looks wrong: stop and say why.
+**implementer.** Runs the whole suite. A test that looks wrong: stop and say why.
 
-**reviewer.** Never edits any file. Tries to break the artifact; reproduces findings where it can.
+**reviewer.** Never edits any file.
 
-**verifier.** Never edits product code, tests or the kit, except line 1 of `verify.md` after its self-run. Drives the real product by the kit, then the break-it pass. Alone records its verdict (`ril ledger record`) and a self-run (`ril ledger selfrun`). Never proves what it built or wrote.
+**verifier.** Never edits product code, tests or the kit, except line 1 of `verify.md` after its self-run. Alone records its verdict (`ril ledger record`) and a self-run (`ril ledger selfrun`). Never proves what it built or wrote.
 
 **fixer.** A failing test that reproduces the defect first, then the root-cause fix.

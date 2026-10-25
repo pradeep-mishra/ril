@@ -1,6 +1,5 @@
 Method: <the scenario's method, as ril scenario list shows it>
-Covers: <project files this proof relies on, or "none yet">
-<!-- Keep lines 1 and 2 first; fill every part; delete this line. -->
+<!-- Keep line 1 first; fill every part; delete this line. -->
 # <id>: <title>
 
 ## Sub-features

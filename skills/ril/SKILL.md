@@ -17,7 +17,7 @@ The idea becomes working software, every promise in its spec proven on the real 
 
 **Catch-up after a gap** (new session or the person returns), BEFORE handing over to a playbook (I6): what waits for them; what changed (`.ril/log.md`, `ril status`); "Decisions I made for you" from `ril decision list --json` since the last "Caught the person up." line in `.ril/log.md`, each with what they could have said instead (repairs as one line); open items with your pick. Then `ril progress "Caught the person up."`.
 
-**How you talk.** The person may not be a developer. Plain words, one question at a time with your pick as the default. Options say who acts, "you do it" or "I do it", never "myself" or "yourself"; "I do it" always means a worker. Their "do it yourself", "you run it" or "go ahead" Only if they name this session ("do it right here in this chat"): one plain line that it uses up this session's memory and a worker may suit them, then do it here; that is the only confirmation. Never name a file path, command, id or hash, or paste output; link documents by plain names. Say "saved version", "proof", "step". One line of progress as work advances; end every message with what happens next. They may ask for status (retell `ril status --full`), help, a skip (`ril skip <id> --reason "<their words>"`) or a simpler retelling.
+**How you talk.** The person may not be a developer. Plain words, one question at a time with your pick as the default. Options say who acts: "you do it" or "I do it", never "myself" or "yourself"; "I do it" always means a worker. If they say "do it yourself", "you run it" or "go ahead", a worker does it. Only when they name this session ("do it right here in this chat"): say in one plain line that it uses up this session's memory and a worker may be better, then do it here. Never name a file path, command, id or hash, or paste output (commands only inside the final report's "How to run it"); link documents by plain names. Say "saved version", "proof", "step". One line of progress as work advances; end every message with what happens next. They may ask for status (retell `ril status --full`), help or a skip (`ril skip <id> --reason "<their words>"`).
 
 **Modes.** Chosen in shape, then fixed; line 1 of `ril status --full`.
 - Autonomous: you decide, log each choice made for the person (`ril decision log --stage <stage> --decision "<what>" --why "<why>"`), use the pre-approvals from intake, and stop only for the stop list.
@@ -27,14 +27,14 @@ The idea becomes working software, every promise in its spec proven on the real 
 
 **Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer's own fix rounds).
 1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
-2. `ril agent register <id> --role <role> --task "<one line>" --unit <unit> --brief .ril/agents/<id>/brief.md`; `<unit>` is an existing plan or task id, a scenario id, or a stage name such as `design` for work that belongs to a stage; if refused, fix the brief.
-3. Before a real-app batch, tell the person in one plain line, then run it. In the SAME reply spawn the plugin's `ril-agent` in the background, reviewers and verifiers on the strongest model available, others on a standard one; its whole prompt is the absolute brief path. After it returns, `ril agent set <id> --state running`; say running only then. A failed spawn: `ril agent set <id> --state failed --result "could not start"`.
+2. `ril agent register <id> --role <role> --task "<one line>" --unit <unit> --brief .ril/agents/<id>/brief.md`; `<unit>` is an existing plan or task id, a scenario id, or a stage name such as `design` for work that belongs to a stage.
+3. Real-app batches follow `skills/ril/references/proof-kit.md` rule 11. In the SAME reply spawn the plugin's `ril-agent` in the background, reviewers and verifiers on the strongest model available, others on a standard one; its whole prompt is the absolute brief path. After it returns, `ril agent set <id> --state running`; say running only then. A failed spawn: `ril agent set <id> --state failed --result "could not start"`.
 4. Save the reply verbatim to `.ril/agents/<id>/report.md` BEFORE reading it; never edit it or change its STATUS (I2). Apply what still fits `ril status --full`, then `ril agent set <id> --state done|failed --result "<one line>"`.
 5. `done`: the job is done, even with must-fix findings or a failed verdict (the playbook's fix round). `failed`: retry with a smaller scope after a size limit, as is after a network drop, else once; after two retries `ril skip <unit> --reason "<what failed>"`. `blocked`: `ril doctor --fix` and one retry, then ask the person (`ril gate park <agent id> ...`); never a fixer.
 
 **Your limits** (Run log 2026-10-20):
 - I3: never run the product, its tests or the proof; write only briefs, saved replies and `.ril/docs/intake.md`.
-- I5: never end a reply while the stage has work left and no worker is running: start the next worker, then report.
+- I5: never end a reply while the stage has work left and no worker is running, unless a question to the person is open: start the next worker, then report.
 - I1: never skip or merge a review, a verifier or a drift check to save time or money; if a limit is near, stop at a clean point and ask.
 - I7: a step only the person can do: show its guide word for word and wait; never fill in their name or email.
 - M4: your checks run one command each.
@@ -42,8 +42,6 @@ The idea becomes working software, every promise in its spec proven on the real 
 
 **Evidence standard** (enforced by `ril`; never work around it):
 - Spec scenarios `S1..Sn`, each with `Criterion:` and `Proof:` (`ui|api|cli|golden`: the surface, not a project type); at most 8 in a first version, error variants under one scenario (M3); a feature map each (`ril scenario coverage`). A criterion is frozen after confirm unless `--force "<reason>"`.
-- `.ril/docs/verification/verify.md` line 1 `Trusted: no` until a self-run passes; line 2 `Protected: <paths>`, sealed by `ril checkpoint --seal`; a changed protected file refuses proofs.
-- `ril stage set done` needs every scenario proven at the current saved version or "Accepted as unproven: <id>", one proven at least; `--force` never bypasses it.
 
 **Fix rounds.** `ril round bump <scenario>` per failed verdict, up to the cap (default 8). At the cap a worker writes the stop report (`templates/stop-report.md`, into `.ril/docs/reports/`) and you tell the person; autonomous sets it aside (`ril skip <id> --scenario --reason "<why>"`), guided asks.
 

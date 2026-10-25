@@ -1,4 +1,4 @@
-<!-- .ril/docs/reports/final.md: plain words, commands only under How to run it; claims labelled measured, inferred or guess. Delete this line. -->
+<!-- .ril/docs/reports/final.md: plain words, commands only under How to run it. Delete this line. -->
 # What I built for you: <project name>
 
 ## What was built

@@ -1,7 +1,5 @@
 # Shape
 
-Goal: a reviewed spec of provable scenarios and an intake of the person's words, handed to design.
-
 ## Checks
 
 - Wrong folder (home, or not where they want): ask where; they start a new session there.

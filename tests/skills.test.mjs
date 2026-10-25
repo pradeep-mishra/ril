@@ -10,9 +10,9 @@ import { headings, helpGroups, readFile, repoRoot, rilCommandsIn } from './helpe
 
 // Structure only: the shape of the router, playbooks, worker files and templates, and that what they name exists. Wording is not pinned.
 const BUDGETS = {
-  'skills/ril/SKILL.md': 1110, 'skills/ril/playbooks/shape.md': 300, 'skills/ril/playbooks/design.md': 500, 'skills/ril/playbooks/accept.md': 220,
-  'skills/ril/playbooks/build.md': 530, 'skills/ril/playbooks/prove.md': 450, 'skills/ril/playbooks/prototype.md': 235, 'skills/ril/references/review.md': 305,
-  'skills/ril/references/proof-kit.md': 560, 'skills/ril/worker-rules.md': 430, 'agents/ril-agent.md': 80, 'principles.md': 120,
+  'skills/ril/SKILL.md': 1070, 'skills/ril/playbooks/shape.md': 285, 'skills/ril/playbooks/design.md': 480, 'skills/ril/playbooks/accept.md': 190,
+  'skills/ril/playbooks/build.md': 525, 'skills/ril/playbooks/prove.md': 395, 'skills/ril/playbooks/prototype.md': 180, 'skills/ril/references/review.md': 315,
+  'skills/ril/references/proof-kit.md': 580, 'skills/ril/worker-rules.md': 375, 'agents/ril-agent.md': 50, 'principles.md': 75,
 };
 const TEMPLATES = ['agent-brief', 'agent-report', 'spec', 'project-brief', 'feature-map', 'stop-report', 'verify', 'final-report'].map((n) => `templates/${n}.md`);
 const PLAYBOOKS = ['shape', 'design', 'accept', 'build', 'prove', 'prototype'].map((n) => `skills/ril/playbooks/${n}.md`);

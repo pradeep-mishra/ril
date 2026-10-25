@@ -4,10 +4,9 @@ Goal: every scenario proven on the real product at the current saved version, by
 
 ## Write the kit (design, before code)
 - An author writes `verify.md` and `.ril/docs/verification/feature-map/<id>.md` per scenario (set aside: its `Method:` line and why) from the spec and design.
-- Design's bundle review covers the kit (`skills/ril/references/review.md`); no separate kit review.
 
 ## Trust the kit (the pilot's first build)
-- A verifier runs the kit (its one red run of real-app checks), then makes one deliberate break, in a throwaway copy, of what one check covers: that check fails; undone, it passes. Both runs saved under `.ril/evidence/kit/<saved version>/`.
+- A verifier runs the kit (its one real-app red run), then makes one deliberate break, in a throwaway copy, of what one check covers: that check fails; undone, it passes. Both runs saved under `.ril/evidence/kit/<saved version>/`.
 - It runs `ril ledger selfrun <saved version> --break <file> --restored <file> --verifier <agent id>` and sets line 1 to `Trusted: yes (<saved version>)`.
 
 ## Drift check (after a stop, and each plan after the first)
@@ -19,8 +18,8 @@ Goal: every scenario proven on the real product at the current saved version, by
 - One fresh verifier per scenario (`--unit <scenario>`), given the spec, `verify.md`, its feature map and the reviewer's reply. It runs the verify command, every path in the map and the break-it pass, saves evidence, and records `ril ledger record <scenario> <V> <proven-<method>|failed|blocked> --evidence <file> --verifier <agent id> --review <clean|risks|none> --checks <n>`.
 
 ## Fix loop
-- `failed`: `ril round bump <scenario>`, a fresh fixer with the verdict, `ril checkpoint`, the reviewer, fresh verifiers for the plan's scenarios.
-- Failed self-run: weak check to a tester, wrong kit step to an author, a product that will not start to a fixer.
+- `failed`: `ril round bump <scenario>`, the fix round with the verdict (`skills/ril/playbooks/build.md`), `ril checkpoint`, a fresh reviewer, fresh verifiers for the plan's scenarios.
+- Failed self-run: weak check to a tester, wrong kit step to an author, a product that will not start to the fix round.
 - All proven or set aside: `ril unit set <id> --state verified --checkpoint <V>` for the plan and each task.
 
 ## Evidence required for done
