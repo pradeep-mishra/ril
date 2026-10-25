@@ -11,7 +11,7 @@ Every rule the R3 rewrite removed, where it was, and why. Reasons: duplicate, wo
 | Vocabulary list (unit, stage, ledger, verdict) | ril, ril-verify, ril-build | duplicate; kept once as "saved version, proof, step" |
 | Separate control skill; ten numbered spawn steps | ril-control | duplicate; folded into router "Running workers" |
 | Write the report to `report.md` | ril-control, all roles | replaced by I2: the reply is the report, saved verbatim by the controller |
-| Probe a running agent read-only via `ril agent list --active` | ril-control | wording-level; resume is already forbidden |
+| Probe a running agent read-only via `ril agent list --active` | ril-control | wording-level; resume is forbidden except an implementer's own fix rounds |
 | `ril unit set <unit> --state doing/todo` around spawns | ril-control | wording-level; build.md sets unit states |
 | Confirm a verdict landed with `ril ledger check` | ril-control | duplicate; lives in prove.md |
 | Late result reconciled before applying | ril-control | kept as one clause ("apply what still fits") |

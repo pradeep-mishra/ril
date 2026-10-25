@@ -23,11 +23,11 @@ The idea becomes working software, every promise in its spec proven on the real 
 - Autonomous: you decide, log each choice made for the person (`ril decision log --stage <stage> --decision "<what>" --why "<why>"`), use the pre-approvals from intake, and stop only for the stop list.
 - Guided: the same, plus a sign-off on each stage's key document (`ril gate park signoff-<what> --question "<plain words>" --options "yes|change it" --default yes`).
 
-**Stop list** (ask first, unless pre-approved at intake): spending money; losing or deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
+**Stop list** (ask first, unless pre-approved at intake): spending money; deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
 
-**Running workers.** Fresh workers do all the work, one at a time, never resumed.
-1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; `rules`: absolute paths of `skills/ril/worker-rules.md` then `principles.md`; paths, never pasted text; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
-2. `ril agent register <id> --role <role> --task "<one line>" --unit <unit> --brief .ril/agents/<id>/brief.md`; `<unit>` is an existing plan or task id, a scenario id, or a stage name such as `design` for work that belongs to a stage (`ril unit add` creates plans and tasks); if refused, fix the brief.
+**Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer's own fix rounds).
+1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
+2. `ril agent register <id> --role <role> --task "<one line>" --unit <unit> --brief .ril/agents/<id>/brief.md`; `<unit>` is an existing plan or task id, a scenario id, or a stage name such as `design` for work that belongs to a stage; if refused, fix the brief.
 3. Before a real-app batch, tell the person in one plain line, then run it. In the SAME reply spawn the plugin's `ril-agent` in the background, reviewers and verifiers on the strongest model available, others on a standard one; its whole prompt is the absolute brief path. After it returns, `ril agent set <id> --state running`; say running only then. A failed spawn: `ril agent set <id> --state failed --result "could not start"`.
 4. Save the reply verbatim to `.ril/agents/<id>/report.md` BEFORE reading it; never edit it or change its STATUS (I2). Apply what still fits `ril status --full`, then `ril agent set <id> --state done|failed --result "<one line>"`.
 5. `done`: the job is done, even with must-fix findings or a failed verdict (the playbook's fix round). `failed`: retry with a smaller scope after a size limit, as is after a network drop, else once; after two retries `ril skip <unit> --reason "<what failed>"`. `blocked`: `ril doctor --fix` and one retry, then ask the person (`ril gate park <agent id> ...`); never a fixer.
@@ -42,13 +42,10 @@ The idea becomes working software, every promise in its spec proven on the real 
 
 **Evidence standard** (enforced by `ril`; never work around it):
 - Spec scenarios `S1..Sn`, each with `Criterion:` and `Proof:` (`ui|api|cli|golden`: the surface, not a project type); at most 8 in a first version, error variants under one scenario (M3); a feature map each (`ril scenario coverage`). A criterion is frozen after confirm unless `--force "<reason>"`.
-- `.ril/docs/verification/verify.md` line 1 `Trusted: no` until a self-run passes (prove); line 2 `Protected: <paths>`, sealed by `ril checkpoint --seal` after the tester; a changed protected file refuses proofs until a fresh tester restores it.
-- One registered verifier per scenario at the current saved version; `--checks` at least 1; `--review clean` (or `risks` after "Accepted risk for <id>"). A failed verdict carries expected, observed, repro, evidence.
-- `ril stage set done` needs every scenario proven at the current saved version or "Accepted as unproven: <id>", and one proven at least; `--force` never bypasses it.
+- `.ril/docs/verification/verify.md` line 1 `Trusted: no` until a self-run passes; line 2 `Protected: <paths>`, sealed by `ril checkpoint --seal`; a changed protected file refuses proofs.
+- `ril stage set done` needs every scenario proven at the current saved version or "Accepted as unproven: <id>", one proven at least; `--force` never bypasses it.
 
 **Fix rounds.** `ril round bump <scenario>` per failed verdict, up to the cap (default 8). At the cap a worker writes the stop report (`templates/stop-report.md`, into `.ril/docs/reports/`) and you tell the person; autonomous sets it aside (`ril skip <id> --scenario --reason "<why>"`), guided asks.
-
-**Recovery.** Crash-safe state lives only in `.ril/`, changed only by you through `ril` (the verifier records its own verdicts).
 
 ## Done when
 

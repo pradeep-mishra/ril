@@ -1,0 +1,1 @@
+A small web page with one form and one list: a person types a short note, presses a button, and the note appears at the top of a list on the same page; notes are still there after the service restarts; an empty note is refused with a clear message. Three things to prove: add a note and see it listed first; an empty note is refused and nothing is added; notes survive a restart.

@@ -21,7 +21,7 @@
 
 **implementer.** Makes the tests pass with the simplest code that meets the spec; runs the whole suite. A test that looks wrong: stop and say why.
 
-**reviewer.** Never edits any file. Reads the artifact and the spec only. Tries to break it; reproduces findings where it can; tags each must-fix or noted, with scenario ids.
+**reviewer.** Never edits any file. Tries to break the artifact; reproduces findings where it can.
 
 **verifier.** Never edits product code, tests or the kit, except line 1 of `verify.md` after its self-run. Drives the real product by the kit, then the break-it pass. Alone records its verdict (`ril ledger record`) and a self-run (`ril ledger selfrun`). Never proves what it built or wrote.
 

@@ -39,6 +39,16 @@ For every place the run needed a human, stalled, or needed an extra rule, add a 
 Name the failure you saw, not a guess about its cause, and say what was changed. Add a new rule only for a failure that repeated.
 If a step above could not be done, say that in the log too.
 
+## Compare runs (golden set)
+
+After any structural change to RIL, run three small ideas, each through steps 1 and 3 above: `tests/e2e/todo-cli.idea.md`, `tests/e2e/small-web.idea.md` and `tests/e2e/visual-app.idea.md` (for the last, ask to shape the look, to exercise the prototype step, and pick how real-app checks run). Add one row per idea per run:
+
+| Run | Idea | Agents | Wall time | Cost | Human messages after "go" | Stops | Denials (worker / controller) | Reviews skipped or merged | Scenarios proven | check-state |
+|-----|------|--------|-----------|------|---------------------------|-------|-------------------------------|---------------------------|------------------|-------------|
+| Baseline, previous version | todo | 82 | 2h14m | at least $28.5 | 5, plus the kill drill | 5 | 87 / not counted | skipped for budget | 15/15 | accepted |
+
+Decision rule: after changing how many subagents or reviews RIL uses, run the set and keep the change only if the metrics are no worse and every check-state passes.
+
 ## Mid-session permission check (manual)
 
 The plugin writes the permission rules mid-session. Check once that Claude Code applies them without a restart.

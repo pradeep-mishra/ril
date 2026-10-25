@@ -4,7 +4,7 @@ A fresh reviewer, never the author, attacks the artifact.
 
 ## Who reviews what
 
-- LIGHT, at most 2 rounds: spec, design, tool list, kit, plans, tasks, brief. "Must-fix only for a contradiction, an unprovable criterion or a missing case; everything else is noted; invent no risks."
+- LIGHT, at most 2 rounds: the spec; the design bundle (design, tool list, kit, plans, brief) as one; each plan's tasks. "Must-fix only for a contradiction, an unprovable criterion or a missing case; everything else is noted; invent no risks."
 - FULL, at most 3 rounds: built code and the running product. "Full adversarial effort, each finding reproduced where possible; must-fix is anything that breaks a promise, contradicts the spec, is unsafe or cannot be proven."
 
 ## Brief
@@ -15,7 +15,7 @@ A fresh reviewer, never the author, attacks the artifact.
 
 ## Rounds
 
-- Must-fix goes to a fresh author (documents) or fixer (code), then a fresh reviewer.
+- Must-fix goes to a fresh author (documents) or a fixer (code; see build.md), then a fresh reviewer.
 - At the cap (I8): the rest goes to one more fresh author or fixer with the findings, which fixes or disputes each. Only a disputed must-fix becomes an accepted risk: `ril decision log --stage <stage> --decision "Accepted risk for <id>: <finding>" --why "<the dispute>"`, one per affected scenario. Tell the person; guided asks first (`ril gate park review-<unit> ...`).
 
 ## Evidence required for done

@@ -12,7 +12,7 @@ Goal: a reviewed spec of provable scenarios and an intake of the person's words,
 - Cut to the core loop: the fewest scenarios that make it useful; the rest under `## Later`.
 - An author writes `.ril/docs/spec.md` from `templates/spec.md`. Acceptance: each `### S<n>: <title>` has a Criterion a person checks by doing and seeing, and a Proof surface; what no run can show goes under `## Needs a person`; no placeholder.
 - `ril scenario import .ril/docs/spec.md --check`; problems go to a fresh author. Each Needs-a-person item: `ril gate park needs-<n> ...`, asked now.
-- Light review (`skills/ril/references/review.md`); guided: the person signs off.
+- Spec review, light (`skills/ril/references/review.md`); guided: the person signs off.
 - `ril scenario import .ril/docs/spec.md`, then `ril stage set design`.
 
 ## Evidence required for done

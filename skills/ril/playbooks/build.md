@@ -11,8 +11,10 @@ Goal: each plan built test first, one task at a time, plans in order; its code s
   2. `ril checkpoint --seal`, only after a tester.
   3. An implementer makes them pass.
   4. `ril checkpoint`; if it says protected files changed, a fresh tester restores them and seals.
-  5. `ril unit set plan-<n>-t<k> --state built`.
-- **Review.** All tasks built: `ril checkpoint`, then a full review of the files changed since the plan's start. Must-fix goes to a fresh fixer (a protected-file finding, a fresh tester), then `ril checkpoint` and a fresh reviewer. The review checks `git ls-files` for generated output; any found: fix `.gitignore`, `git rm -r --cached <path>`, `ril checkpoint`.
+  5. A task marked `Risk: high` in the tasks file (rails, security, money, data loss, concurrency, design.md's costly-bug places) gets a full review of its files now; others skip it.
+  6. `ril unit set plan-<n>-t<k> --state built`.
+- **Review**, build's adversarial review: ONE full review of the plan's whole diff since its start, when its last task is built (`ril checkpoint` first), before prove's verifiers. It checks `git ls-files` for generated output; any found: fix `.gitignore`, `git rm -r --cached <path>`, `ril checkpoint`.
+- **Fix round.** Must-fix in code resumes the implementer that wrote it (same worker, same context): send the findings, `ril agent set <implementer id> --state running`, save each new reply as its own file (`report-2.md`, never overwriting), then done or failed again. The fix starts with a failing test; then `ril checkpoint` and a fresh reviewer, never the implementer. A protected-file finding goes to a fresh tester. If it cannot be resumed (stopped, lost in a crash with no newer reply file, host refuses): a fresh `fixer` with the brief and the previous replies. Documents keep fresh authors.
 - **Scope.** A task needing a file outside its `touch`, another scenario or a design change stops. Autonomous: a fresh author changes the tasks or plan, decision logged. Guided: ask first.
 
 ## Evidence required for done
