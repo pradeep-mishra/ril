@@ -1,4 +1,4 @@
-# RIL
+# RIL (Run in loop)
 
 RIL is a Claude Code plugin that turns an idea, described in plain words, into working software that has been proven by running it.
 You answer a few questions. RIL writes down what the software must do, builds it test first, and checks each promise on the real thing before it says it is done.
@@ -7,15 +7,59 @@ It is made for anyone, not only developers, and aims to work for any kind of sof
 ## Install and start
 
 You need Claude Code, Node.js 20.10 or newer, and git.
-There is no published copy yet, so use a local copy of this folder.
+Install it from GitHub, inside Claude Code:
 
-- Try it for one session: `claude --plugin-dir <path to this folder>`
-- Install it as a Claude Code plugin, inside Claude Code:
-  `/plugin marketplace add <path to this folder>` then `/plugin install ril@ril`, then start a new session.
+```
+/plugin marketplace add pradeep-mishra/ril
+/plugin install ril@ril
+```
+
+Then start a new session (or run `/reload-plugins`).
+
+If the clone fails (for example, you have no GitHub SSH key), use the full HTTPS URL instead:
+`/plugin marketplace add https://github.com/pradeep-mishra/ril.git`
+
+From a terminal instead:
+
+```
+claude plugin marketplace add pradeep-mishra/ril
+claude plugin install ril@ril
+```
+
+To update later: `/plugin marketplace update ril`, then reinstall or update the plugin.
+
+To try it from a local copy without installing: `claude --plugin-dir <path to this ril folder>`
 
 Then make an empty folder, open Claude Code in it, type `/ril` and describe what you want.
 Say yes when Claude Code asks you to trust the folder, so RIL's helpers can work without stopping to ask.
 If git does not know your name and email, RIL shows you the exact commands to set them for this project only.
+
+## Try it
+
+**Example 1: a command-line tool**
+
+```
+mkdir bigfiles && cd bigfiles
+claude
+```
+
+Type `/ril`, then paste:
+
+> I want a command-line tool called bigfiles. I give it a folder path and it prints the 10 largest files inside that folder and its subfolders, biggest first, with sizes like "4.2 MB". If the folder does not exist it says so in one clear line.
+
+**Example 2: a small web page**
+
+```
+mkdir todo-page && cd todo-page
+claude
+```
+
+Type `/ril`, then paste:
+
+> I want a single web page for my daily to-do list. I type a task and press Enter to add it, click a task to tick it off, and can delete a task. My tasks are still there when I reload the page. No login, no server.
+
+RIL asks a few questions, builds it, runs it to prove it works, and tells you how to start it.
+The more you say about what it must do, the fewer questions you get.
 
 ## What happens
 
