@@ -4,7 +4,7 @@ A fresh reviewer, never the author, attacks the artifact.
 
 ## Who reviews what
 
-- LIGHT, at most 2 rounds: the spec; the design bundle as one; each plan's tasks. "Must-fix only for a contradiction, an unprovable criterion, a missing case or a plan over design.md's size rule; everything else is noted; invent no risks."
+- LIGHT, at most 2 rounds: the spec; the design bundle as one; each plan's tasks. "Must-fix only for a contradiction, an unprovable criterion, a missing case or a plan over 10 tasks; everything else is noted; invent no risks."
 - FULL, at most 3 rounds: built code and the running product. "Full adversarial effort, each finding reproduced where possible; must-fix is anything that breaks a promise, contradicts the spec, is unsafe or cannot be proven."
 
 ## Brief
