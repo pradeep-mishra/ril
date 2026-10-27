@@ -25,12 +25,12 @@ The idea becomes working software, every promise in its spec proven on the real 
 
 **Stop list** (ask first, unless pre-approved at intake): spending money; losing or deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
 
-**Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer's own fix rounds).
+**Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer the build playbook resumes).
 1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
 2. `ril agent register <id> --role <role> --task "<one line>" --unit <unit> --brief .ril/agents/<id>/brief.md`; `<unit>` is an existing plan or task id, a scenario id, or a stage name such as `design` for work that belongs to a stage.
 3. Real-app batches follow `skills/ril/references/proof-kit.md` rule 11. In the SAME reply spawn the plugin's `ril-agent` in the background, reviewers and verifiers on the strongest model available, others on a standard one; its whole prompt is the absolute brief path. After it returns, `ril agent set <id> --state running`; say running only then. A failed spawn: `ril agent set <id> --state failed --result "could not start"`.
-4. Save the reply verbatim to `.ril/agents/<id>/report.md` BEFORE reading it; never edit it or change its STATUS (I2). Apply what still fits `ril status --full`, then `ril agent set <id> --state done|failed --result "<one line>"`.
-5. `done`: the job is done, even with must-fix findings or a failed verdict (the playbook's fix round). `failed`: retry with a smaller scope after a size limit, as is after a network drop, else once; after two retries `ril skip <unit> --reason "<what failed>"`. `blocked`: `ril doctor --fix` and one retry, then ask the person (`ril gate park <agent id> ...`); never a fixer.
+4. Save the reply verbatim to `.ril/agents/<id>/report.md` BEFORE reading it; never edit it or change its STATUS (I2). Apply what still fits `ril status --full`, then `ril agent set <id> --state done|failed|blocked --result "<one line>"`.
+5. `done`: the job is done, even with must-fix findings or a failed verdict (the playbook's fix round). `failed`: retry with a smaller scope after a size limit, as is after a network drop, else once; after two retries `ril skip <unit> --reason "<what failed>"`. `blocked`: a missing tool, permission or sandbox failure goes to the person at once (`ril gate park <agent id> ...`), never a retry or a fixer; any other block: `ril doctor --fix` and one retry, then ask.
 
 **Your limits** (Run log 2026-10-20):
 - I3: never run the product, its tests or the proof; write only briefs, saved replies and `.ril/docs/intake.md`.

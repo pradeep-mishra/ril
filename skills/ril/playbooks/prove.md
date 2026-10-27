@@ -14,7 +14,7 @@ Goal: every scenario proven on the real product at the current saved version, by
 - Regression: a fresh verifier for that scenario records `failed`. Kit drift (a Doctor failure included): an author repairs it, then a new self-run. Stale test: a fresh tester.
 
 ## Verify (each plan, and accept)
-- At saved version V, first a full review of the running product.
+- At saved version V, first a full review of the running product (build's review read the diff; this one runs it).
 - One fresh verifier per scenario (`--unit <scenario>`), given the spec, `verify.md`, its feature map and the reviewer's reply. It runs the verify command, every path in the map and the break-it pass, saves evidence, and records `ril ledger record <scenario> <V> <proven-<method>|failed|blocked> --evidence <file> --verifier <agent id> --review <clean|risks|none> --checks <n>`.
 
 ## Fix loop

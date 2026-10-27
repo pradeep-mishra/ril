@@ -77,6 +77,7 @@ test('brief shape problems: duplicate field, inline list value, unknown unit, a 
     const inline = reg('V1', writeBrief(dir, 'verifier', (t) => t.replace('touch:\n- .ril/evidence/S1/', 'touch: .ril/evidence/S1/')));
     assert.equal(inline.code, 6);
     assert.match(inline.stderr, /touch.*must be a list/);
+    assert.match(reg('V1', writeBrief(dir, 'verifier', (t) => t.replace('- .ril/evidence/S1/\n', ''))).stderr, /touch field is empty; .*- none/);
     const nowhere = reg('V1', writeBrief(dir, 'verifier', (t) => t.replace('unit: S1', 'unit: S99')));
     assert.equal(nowhere.code, 6);
     assert.match(nowhere.stderr, /S99.*ril unit list.*ril scenario list.*shape, design, confirm/s, 'the message says what a unit may be');
@@ -94,17 +95,19 @@ test('brief shape problems: duplicate field, inline list value, unknown unit, a 
   });
 });
 
-test('a done or failed agent must say what it did, so its unit is not held forever', () => {
+test('a done, failed or blocked agent must say what it did, so its unit is not held forever', () => {
   withRepo((dir) => {
     addScenario(dir, 'S1');
     register(dir, 'V1', 'verifier');
-    for (const state of ['done', 'failed']) {
+    for (const state of ['done', 'failed', 'blocked']) {
       const r = fails(dir, 1, 'agent', 'set', 'V1', '--state', state);
       assert.match(r.stderr, /--result/);
       assert.equal(load(dir).agents[0].state, 'registered', 'nothing changed');
       fails(dir, 1, 'agent', 'set', 'V1', '--state', state, '--result', '  ');
     }
     ok(dir, 'agent', 'set', 'V1', '--state', 'stopped');
+    ok(dir, 'agent', 'set', 'V1', '--state', 'blocked', '--result', 'swift test needs the sandbox off');
+    assert.equal(load(dir).agents[0].state, 'blocked');
     ok(dir, 'agent', 'set', 'V1', '--state', 'failed', '--result', 'could not start the app');
     assert.equal(load(dir).agents[0].result, 'could not start the app');
   });

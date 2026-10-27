@@ -4,14 +4,14 @@ A fresh reviewer, never the author, attacks the artifact.
 
 ## Who reviews what
 
-- LIGHT, at most 2 rounds: the spec; the design bundle as one; each plan's tasks. "Must-fix only for a contradiction, an unprovable criterion or a missing case; everything else is noted; invent no risks."
+- LIGHT, at most 2 rounds: the spec; the design bundle as one; each plan's tasks. "Must-fix only for a contradiction, an unprovable criterion, a missing case or a plan over design.md's size rule; everything else is noted; invent no risks."
 - FULL, at most 3 rounds: built code and the running product. "Full adversarial effort, each finding reproduced where possible; must-fix is anything that breaks a promise, contradicts the spec, is unsafe or cannot be proven."
 
 ## Brief
 
 - `inputs`: the artifact and the spec only (the intake when it reviews the spec), never the author's reply or earlier reviews.
 - `acceptance`: the LIGHT or FULL line verbatim; one `- finding: <must-fix|noted> <scenario ids> <what breaks, where>` item per finding in the reply; RESULT starts `must-fix: N, noted: M`.
-- Ask (a LIGHT review reports only its three must-fix kinds; the rest is noted): Could this pass while the product is broken? What input, empty state, repeat or interruption breaks it? What promise is missed? Does each proof observe the criterion through the surface a person uses? What is too complex?
+- Ask (a LIGHT review reports only its four must-fix kinds; the rest is noted): Could this pass while the product is broken? What input, empty state, repeat or interruption breaks it? What promise is missed? Does each proof observe the criterion through the surface a person uses? What is too complex?
 
 ## Rounds
 

@@ -2,9 +2,9 @@
 
 ## Standing rules
 
-1. Your role is the brief's `role`; do only its `goal`. Write only the paths in `touch`, plus a temp folder you make and remove.
+1. Your role is the brief's `role`; do only its `goal`. Write only the paths in `touch` (`none`: nothing), plus a temp folder you make and remove.
 2. Never edit ril's state (`.ril/state.json`, its backups, lock or log); run `ril` only to read, except the verifier's records.
-3. One simple command per call: no `cd`, `;`, `&&`, pipes, redirects or `$(...)`. Call it `ril <subcommand>`, never by path. Approved tools only; a refused command means `STATUS: blocked` naming it. (Run log 2026-10-20, C1)
+3. One simple command per call: no `cd`, `;`, `&&`, pipes, redirects or `$(...)`. Call it `ril <subcommand>`, never by path. Approved tools only; a refused or sandbox-blocked command means `STATUS: blocked` naming it; never retry it with the sandbox off. (Run log 2026-10-20, C1)
 4. Your reply is the report, in the agent-report format; write no report or findings files. (Run log 2026-10-20, I2)
 5. `done`: you did the job, even if it found problems. `failed`: you could not; say why. `blocked`: a tool, file, permission or network is missing; name it.
 6. Save output with your file tool, unchanged.
@@ -17,9 +17,9 @@
 
 **author.** Every promise checkable on the running product; a guess goes in the reply as a question with your pick.
 
-**tester.** Blind to the implementation: never reads product source. Writes acceptance tests through the interface a person or caller uses, at least one per acceptance line, and shows each failing for the stated reason. No hollow tests: no expected value from the code under test, no assertion on data the test built. Only the tester changes `Protected:` paths.
+**tester.** Blind to the implementation: never reads product source. Writes acceptance tests through the interface a person or caller uses, with the signatures the task's `Tests:` names, at least one per acceptance line, and shows each failing for the stated reason. No hollow tests: no expected value from the code under test, no assertion on data the test built. Only the tester changes `Protected:` paths.
 
-**implementer.** Runs the whole suite. A test that looks wrong: stop and say why.
+**implementer.** Runs the task's `Run:` list. A test that looks wrong: stop, quote the line and say why.
 
 **reviewer.** Never edits any file.
 

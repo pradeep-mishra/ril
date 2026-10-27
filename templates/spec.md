@@ -5,7 +5,7 @@
 ## Non-goals
 
 ## Scenarios
-<!-- At most 8. Criterion: what a person does and sees. Proof: the surface: ui, api, cli or golden. -->
+<!-- Criterion: what a person does and sees. Proof: the surface: ui, api, cli or golden. -->
 
 ### S1: <short title>
 Criterion: <Doing this shows that.>

@@ -8,7 +8,7 @@ inputs:
 acceptance:
 - <a checkable condition, copied, never loosened>
 touch:
-- <absolute path this agent may change>
+- <absolute path this agent may change, or "none">
 rules:
 - <plugin folder>/skills/ril/worker-rules.md
 - <plugin folder>/principles.md
