@@ -72,21 +72,6 @@ test('scenario import refuses an empty spec and a clash with different wording, 
   });
 });
 
-test('scenario add idempotent and conflicting', () => {
-  withProject((dir) => {
-    addScenario(dir, 'S1');
-    addScenario(dir, 'S1');
-    assert.equal(load(dir).scenarios.length, 1);
-    const clash = fails(dir, 1, 'scenario', 'add', 'S1', '--title', 'Title S1', '--method', 'cli', '--criterion', 'something else');
-    assert.match(clash.stderr, /Next: use scenario update/);
-    assert.equal(load(dir).scenarios[0].criterion, 'Criterion S1');
-    assert.match(fails(dir, 1, 'scenario', 'add', 'S2', '--title', 't', '--method', 'human', '--criterion', 'c').stderr, /Next: /);
-    assert.match(fails(dir, 1, 'scenario', 'add', 'S2', '--title', 't', '--method', 'cli').stderr, /Next: /);
-    assert.match(fails(dir, 1, 'scenario', 'add', '../S2', '--title', 't', '--method', 'cli', '--criterion', 'c').stderr, /Next: /);
-    assert.equal(load(dir).scenarios.length, 1);
-  });
-});
-
 test('scenario update while unproven, an empty value, list and json', () => {
   withProject((dir) => {
     addScenario(dir, 'S1');

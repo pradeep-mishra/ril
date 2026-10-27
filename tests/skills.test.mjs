@@ -93,7 +93,9 @@ test('spec template imports clean', () => {
 
 test('a filled feature map passes ril scenario coverage', () => {
   inTempProject((dir) => {
-    const add = ril(dir, 'scenario', 'add', 'S1', '--title', 'Greets', '--method', 'cli', '--criterion', 'hello prints hi');
+    const spec = path.join(dir, 'spec.md');
+    fs.writeFileSync(spec, '### S1: Greets\nCriterion: hello prints hi\nProof: cli\n');
+    const add = ril(dir, 'scenario', 'import', spec);
     assert.equal(add.code, 0, add.stdout + add.stderr);
     assert.equal(ril(dir, 'scenario', 'coverage').code, 2, 'no map yet');
     const filled = readFile('templates/feature-map.md').text.replace(/^Method: <[^>\n]+>/, 'Method: cli').replace(/<[^>\n]+>/g, 'filled');

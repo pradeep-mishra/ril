@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkAllow, loadTools } from '../lib/commands/tools.mjs';
 import { ril, repoRoot } from './helpers/ril.mjs';
-import { fails } from './helpers/repo.mjs';
+import { fails, withRepo } from './helpers/repo.mjs';
 import { inTmp } from './helpers/tmp.mjs';
 import { failsIn, rilIn, writeTools } from './helpers/tools.mjs';
 
@@ -172,5 +172,12 @@ test('the cli-todo example has a tool list that loads, passes the permission che
     assert.deepEqual(checkAllow(list.allow), []);
     const r = await rilIn(dir, ['preflight']);
     assert.equal(r.code, 0, r.stdout + r.stderr);
+  });
+});
+
+test('doctor names a deny rule on .ril in the Claude Code settings', () => {
+  withRepo((dir) => {
+    fs.mkdirSync(path.join(dir, '.claude')); fs.writeFileSync(path.join(dir, '.claude', 'settings.local.json'), JSON.stringify({ permissions: { deny: ['Write(.ril/state.json)'] } }));
+    assert.match(fails(dir, 1, 'doctor').stdout + fails(dir, 1, 'doctor').stderr, /deny writes to \.ril \(Write\(\.ril\/state\.json\)\)/);
   });
 });

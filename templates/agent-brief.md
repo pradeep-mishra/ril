@@ -1,4 +1,4 @@
-<!-- Agent brief, at most 60 lines: "field:" lines, list fields take "- " items, paths not pasted text. Delete this line. -->
+<!-- Agent brief, at most 60 lines: "field:" lines, list fields take "- " items, paths not pasted text; `ril: ril`, never a path. Delete this line. -->
 role: <author|tester|implementer|reviewer|verifier|fixer>
 unit: <the plan, task, scenario or stage>
 goal: <one line: the outcome>
@@ -12,7 +12,7 @@ touch:
 rules:
 - <plugin folder>/skills/ril/worker-rules.md
 - <plugin folder>/principles.md
-ril: <the exact command that runs ril>
+ril: ril
 report: agent-report
 stop:
 - <when to stop and reply, including the stop list>

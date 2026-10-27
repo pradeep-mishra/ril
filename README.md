@@ -32,6 +32,7 @@ To try it from a local copy without installing: `claude --plugin-dir <path to th
 
 Then make an empty folder, open Claude Code in it, type `/ril` and describe what you want.
 Say yes when Claude Code asks you to trust the folder, so RIL's helpers can work without stopping to ask.
+Once per machine, so the `ril` command itself never asks: in Claude Code run `/permissions` and add the rule `Bash(ril *)` at user level.
 If git does not know your name and email, RIL shows you the exact commands to set them for this project only.
 
 ## Try it

@@ -219,6 +219,9 @@ test('a lock file that cannot be created blames the sandbox for a refused write 
     const next = (code) => { try { withLock(dir, () => {}, { open: fail(code) }); } catch (e) { return e instanceof RilError && /could not create its lock file/.test(e.plain) ? e.next : assert.fail(e.message); } };
     assert.match(next('EPERM'), /sandbox/);
     assert.doesNotMatch(next('EROFS'), /sandbox/);
+    fs.mkdirSync(path.join(dir, '.claude'));
+    fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { deny: ['Edit(.ril/.lock)', 'Edit(src/**)'] } }));
+    assert.match(next('EPERM'), /deny writes to \.ril \(Edit\(\.ril\/\.lock\)\)/);
   });
 });
 

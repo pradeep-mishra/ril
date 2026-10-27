@@ -93,8 +93,11 @@ export function trustKit(dir, ...more) {
   write(`Trusted: yes (${head(dir).slice(0, 7)})`);
 }
 
-export const addScenario = (dir, id = 'S1', method = 'cli') =>
-  ok(dir, 'scenario', 'add', id, '--title', `Title ${id}`, '--method', method, '--criterion', `Criterion ${id}`);
+export function addScenario(dir, id = 'S1', method = 'cli') {
+  const spec = path.join(dir, '.ril', `spec-${id}.md`);
+  fs.writeFileSync(spec, `### ${id}: Title ${id}\nCriterion: Criterion ${id}\nProof: ${method}\n`);
+  ok(dir, 'scenario', 'import', spec);
+}
 
 // Writes a brief for `role` inside .ril (which git ignores), based on the good fixture.
 export function writeBrief(dir, role, edit = (t) => t, name = role) {

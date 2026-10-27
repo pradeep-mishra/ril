@@ -192,22 +192,22 @@ test('skip warns about a working agent and about a proof being set aside', () =>
 
 test('skip refuses an unknown id, and an id that is both a unit and a scenario unless told which', () => {
   withRepo((dir) => {
-    addScenario(dir, 'X1');
-    addUnit(dir, 'X1');
+    addScenario(dir, 'S5');
+    addUnit(dir, 'S5');
     addScenario(dir, 'S1');
     const untouched = stateFiles(dir);
     fails(dir, 2, 'skip', 'S9', '--reason', 'gone');
     fails(dir, 1, 'skip', 'S1');
     fails(dir, 2, 'skip', 'S1', '--unit', '--reason', 'not a unit');
     assert.deepEqual(stateFiles(dir), untouched);
-    const r = fails(dir, 1, 'skip', 'X1', '--reason', 'stuck');
+    const r = fails(dir, 1, 'skip', 'S5', '--reason', 'stuck');
     assert.match(r.stderr, /--unit/);
     assert.match(r.stderr, /--scenario/);
-    assert.equal(status(dir, 'X1'), 'unproven');
-    ok(dir, 'skip', 'X1', '--unit', '--reason', 'stuck');
-    assert.equal(unit(dir, 'X1').state, 'parked');
-    assert.equal(status(dir, 'X1'), 'unproven');
-    ok(dir, 'skip', 'X1', '--scenario', '--reason', 'stuck');
-    assert.equal(status(dir, 'X1'), 'parked');
+    assert.equal(status(dir, 'S5'), 'unproven');
+    ok(dir, 'skip', 'S5', '--unit', '--reason', 'stuck');
+    assert.equal(unit(dir, 'S5').state, 'parked');
+    assert.equal(status(dir, 'S5'), 'unproven');
+    ok(dir, 'skip', 'S5', '--scenario', '--reason', 'stuck');
+    assert.equal(status(dir, 'S5'), 'parked');
   });
 });
