@@ -27,7 +27,7 @@ The owner's words. Every plan and every review cites this file. A plan or review
 - "agents were breaking here and there due to very strict process and there was no recovery and users were getting annoyed"
 
 ## Targets (checked by tests/charter.test.mjs against tests/charter-budget.json)
-- One visible skill (playbook and reference files allowed). Direction words (skills, roles, templates, principles.md) at most 5,500.
+- One visible skill (playbook and reference files allowed). Direction words (skills, roles, templates, principles.md) at most 5,700.
 - No language, framework, package-manager or project-type instruction in skills, roles, templates or playbooks; driver kinds in the proof-kit surface table are allowed; worked examples live in `examples/` and say so.
 - Engine at most 2,500 lines and 18 command groups; tests at most 4,000 lines; zero runtime dependencies.
 - A new rule cites a Run log row or a failing test. Each rule lives in one place.

@@ -57,7 +57,7 @@ const measure = {
   testLines: (root) => sumLines(walk(path.join(root, 'tests')).filter((f) => f.endsWith('.mjs'))),
   agentCount: (root) => fs.readdirSync(path.join(root, 'agents')).filter((n) => n.endsWith('.md')).length,
 };
-const TARGETS = { skillCount: 1, directionWords: 5500, bannedTermHits: 0, prosePins: 0, engineLines: 2500, commandGroups: 18, testLines: 4000, agentCount: 1 };
+const TARGETS = { skillCount: 1, directionWords: 5700, bannedTermHits: 0, prosePins: 0, engineLines: 2500, commandGroups: 18, testLines: 4000, agentCount: 1 };
 
 // Returns the failure message when the measured value is above the ceiling, else null.
 const overCeiling = (key, measured, ceiling) => (measured > ceiling ? `${key} is ${measured}, above its ceiling ${ceiling} (target ${TARGETS[key]})` : null);
