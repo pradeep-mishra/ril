@@ -41,7 +41,7 @@ If a step above could not be done, say that in the log too.
 
 ## Compare runs (golden set)
 
-After any structural change to RIL, run three small ideas, each through steps 1 and 3 above: `tests/e2e/todo-cli.idea.md`, `tests/e2e/small-web.idea.md` and `tests/e2e/visual-app.idea.md` (for the last, ask to shape the look, to exercise the prototype step, and pick how real-app checks run). Add one row per idea per run:
+After any structural change to RIL, run three small ideas, each through steps 1 and 3 above (for a change to adopt, also `tests/e2e/existing-repo.idea.md`, run inside a copy of a small project that already has code): `tests/e2e/todo-cli.idea.md`, `tests/e2e/small-web.idea.md` and `tests/e2e/visual-app.idea.md` (for the last, ask to shape the look, to exercise the prototype step, and pick how real-app checks run). Add one row per idea per run:
 
 | Run | Idea | Agents | Wall time | Cost | Human messages after "go" | Stops | Denials (worker / controller) | Reviews skipped or merged | Scenarios proven | check-state |
 |-----|------|--------|-----------|------|---------------------------|-------|-------------------------------|---------------------------|------------------|-------------|
