@@ -23,7 +23,7 @@ The idea becomes working software, every promise in its spec proven on the real 
 - Autonomous: you decide, log each choice made for the person (`ril decision log --stage <stage> --decision "<what>" --why "<why>"`), use the pre-approvals from intake, and stop only for the stop list.
 - Guided: the same, plus a sign-off on each stage's key document (`ril gate park signoff-<what> --question "<plain words>" --options "yes|change it" --default yes`).
 
-**Stop list** (ask first, unless pre-approved at intake): spending money; losing or deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes. When `ril` refuses, do what its `Next:` line says.
+**Stop list** (ask first, unless pre-approved at intake): spending money; losing or deleting data; secrets or credentials; publishing or sending anything outside this computer; any other irreversible or risky action. Never `--force` without the person's yes (asking for the new job or check is one). When `ril` refuses, do what its `Next:` line says.
 
 **Running workers.** Fresh workers do all the work, one at a time, never resumed (except an implementer the build playbook resumes).
 1. Fill `templates/agent-brief.md` into `.ril/agents/<id>/brief.md`, id `<role>-<unit>-<n>`, new `n` per spawn; acceptance copied from the playbook; a retry adds the previous reply to `inputs`.
@@ -41,7 +41,7 @@ The idea becomes working software, every promise in its spec proven on the real 
 - Never record a verdict or mark anything proven or done yourself.
 
 **Evidence standard** (enforced by `ril`; never work around it):
-- Spec scenarios `S1..Sn`, each with `Criterion:` and `Proof:` (`ui|api|cli|golden`: the surface, not a project type); at most 8 in a first version, error variants under one scenario (M3); a feature map each (`ril scenario coverage`). A criterion is frozen after confirm unless `--force "<reason>"`.
+- Spec scenarios `S1..Sn`, each with `Criterion:` and `Proof:` (`ui|api|cli|golden`: the surface, not a project type); at most 8 in a first version, error variants under one scenario (M3). A criterion is frozen after confirm unless `--force "<reason>"`.
 
 **Fix rounds.** `ril round bump <scenario>` per failed verdict, up to the cap (default 8). At the cap a worker writes the stop report (`templates/stop-report.md`, into `.ril/docs/reports/`) and you tell the person; autonomous sets it aside (`ril skip <id> --scenario --reason "<why>"`), guided asks.
 

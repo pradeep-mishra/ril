@@ -16,10 +16,10 @@
 ## Existing repo
 
 - Needs git and a clean tree, else say the fix and stop. Work on branch `ril/<topic>`; never merge, push or rewrite history. Say once that `ril init` adds its pointer to CLAUDE.md and AGENTS.md.
-- The intake adds: how it runs and is tested, what CLAUDE.md, README and CI demand (owner rules), the named area's paths, and one baseline test run, failures noted, never fixed unasked.
+- A worker reads the repo and runs its tests once; the intake adds how it runs, what CLAUDE.md, README and CI demand (owner rules), the area's paths, and baseline failures (noted, never fixed unasked).
 - Scenarios only for what you add or change; an old passing test that fails is a failed verdict. Ask first: migrations, dependency upgrades, CI, files outside the paths.
 - Offer once: stronger checks on any existing part? Skip: never again.
-- Strengthen, only when asked: criteria are intended behavior (their words, then docs, tests; they confirm); design without plans; `ril stage set accept --force "nothing to build"`. An existing test counts only if run now and the verifier judged it exercises the criterion; for the three costliest it also breaks the code, sees it fail, restores it with git. A failure: `ril stage set build --force "<why>"`, a fix plan, the usual rounds.
+- Strengthen, only when asked: criteria are intended behavior (their words, then docs, tests; they confirm); design without plans, confirm, then `ril stage set accept --force "nothing to build"`. An existing test counts only if run now and the verifier judged it exercises the criterion; the evidence names it. For the three costliest it also breaks the code, sees it fail, restores it. A failure: `ril stage set build --force "<why>"`, a fix plan, the usual rounds.
 
 ## Evidence required for done
 
