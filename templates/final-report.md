@@ -11,7 +11,7 @@
 ## What is not covered
 - How it was verified:
 - Assumptions:
-- Left out:
+- Left out (including existing code RIL did not prove):
 - Accepted without proof (with stop reports):
 
 ## Decisions made for you

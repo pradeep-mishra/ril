@@ -10,7 +10,7 @@ A fresh reviewer, never the author, attacks the artifact.
 ## Brief
 
 - `inputs`: the artifact and the spec only (the intake when it reviews the spec), never the author's reply or earlier reviews.
-- `acceptance`: the LIGHT or FULL line verbatim; one `- finding: <must-fix|noted> <scenario ids> <what breaks, where>` item per finding in the reply; RESULT starts `must-fix: N, noted: M`.
+- `acceptance`: the LIGHT or FULL line verbatim; one finding item per finding in the reply; RESULT starts `must-fix: N, noted: M`.
 - Ask: Could this pass while the product is broken? What input, empty state, repeat or interruption breaks it? What promise is missed? Does each proof observe the criterion through the surface a person uses? What is too complex? A visual surface: does it follow `.ril/docs/design-language.md`? Missing or ignored is must-fix.
 
 ## Rounds
