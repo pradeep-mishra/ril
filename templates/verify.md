@@ -7,23 +7,23 @@ Protected: <comma-separated project paths only a tester changes: acceptance test
 - <label>: <driver kind, the approved tool, what it observes>
 
 ## Starting state
-- <Per proof-kit rule 1.>
+- <Data stores, devices, accounts, settings, made fresh each run.>
 
 ## Launch
-- <Per proof-kit rule 2.>
+- <Built and started as a person gets it, outside the project.>
 
 ## Drive
-- Verify command: <per proof-kit rule 7>.
+- Verify command: <one command; reruns every check and prints the count>.
 - <How each driver runs feature map steps.>
 
 ## Evidence
 - <What each surface saves under .ril/evidence/<id>/<saved version>/.>
 
 ## Cleanup
-- <Per proof-kit rule 6.>
+- <What is stopped and removed; evidence stays.>
 
 ## Doctor
-- <Per proof-kit rule 3.>
+- <Builds and starts; the verify command counts above zero; each driver answers.>
 
 ## Self-run
 - <The check to break, the break, the command that fails then passes.>
