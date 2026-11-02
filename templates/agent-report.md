@@ -1,6 +1,6 @@
-<!-- Your reply, never a file. A reviewer adds a finding item per finding; a failed verdict adds expected, observed and repro. Delete this line. -->
+<!-- A reviewer adds a finding item per finding; a failed verdict adds expected, observed and repro. Delete this line. -->
 STATUS: done|failed|blocked
-RESULT: <one line; a reviewer starts "must-fix: N, noted: M"; a verifier names its verdict>
+RESULT: <one line; a verifier names its verdict>
 EVIDENCE:
 - <path of a saved file>
 - finding: <must-fix|noted> <scenario ids> <what breaks, where>
