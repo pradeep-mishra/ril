@@ -12,7 +12,7 @@ import { headings, helpGroups, readFile, repoRoot, rilCommandsIn } from './helpe
 const BUDGETS = {
   'skills/ril/SKILL.md': 1121, 'skills/ril/playbooks/shape.md': 499, 'skills/ril/playbooks/design.md': 540, 'skills/ril/playbooks/accept.md': 190,
   'skills/ril/playbooks/build.md': 673, 'skills/ril/playbooks/prove.md': 390, 'skills/ril/playbooks/prototype.md': 180, 'skills/ril/references/review.md': 360,
-  'skills/ril/references/proof-kit.md': 578, 'skills/ril/worker-rules.md': 418, 'agents/ril-agent.md': 50, 'principles.md': 75,
+  'skills/ril/references/proof-kit.md': 578, 'skills/ril/worker-rules.md': 419, 'agents/ril-agent.md': 50, 'principles.md': 75,
 };
 const TEMPLATES = ['agent-brief', 'agent-report', 'spec', 'project-brief', 'feature-map', 'stop-report', 'verify', 'final-report'].map((n) => `templates/${n}.md`);
 const PLAYBOOKS = ['shape', 'design', 'accept', 'build', 'prove', 'prototype'].map((n) => `skills/ril/playbooks/${n}.md`);

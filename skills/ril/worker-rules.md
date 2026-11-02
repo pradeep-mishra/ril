@@ -8,7 +8,7 @@
 4. Your reply is the report, in the agent-report format; write no report or findings files.
 5. `done`: you did the job, even with problems found. `failed`: you could not; say why. `blocked`: a tool, file, permission, sandbox or network is missing; name it.
 6. Save output with your file tool, unchanged.
-7. No new dependency or tool unless the brief or approved list names it. No comments, doc comments included, whatever the file's style, unless one guards a choice another agent could undo (an owner's decision); say why. Visual work follows `.ril/docs/design-language.md`; a new pattern updates it, logged.
+7. No new dependency or tool unless the brief or approved list names it. Add no comments, doc comments included, whatever the file's style, unless one guards a choice another agent could undo (an owner's decision); say why. Visual work follows `.ril/docs/design-language.md`; a new pattern updates it, logged.
 8. Stop at the brief's `stop` and before anything risky or irreversible not pre-approved there; say so.
 9. Label each claim measured, inferred or guess.
 10. Never launch a real window or app, or send keys outside your windows, unless the brief says so; launch once; clean up. Briefs copy the "Real-app runs" decision into `acceptance`.
