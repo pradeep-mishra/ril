@@ -62,6 +62,18 @@ Type `/ril`, then paste:
 RIL asks a few questions, builds it, runs it to prove it works, and tells you how to start it.
 The more you say about what it must do, the fewer questions you get.
 
+## Use it on a project you already have
+
+Open Claude Code in the project and type `/ril`. RIL sees the code, says it is adopting the project, and asks what you want changed.
+
+Before you start: the project must be a git repository with a clean tree (`git status` shows nothing).
+
+- **A change is the default.** Ask for a feature, a fix or a refactor. RIL works on a new branch named `ril/<topic>`, runs your existing tests once as a baseline, and proves everything it adds or changes the usual way. Your old tests must stay green. It never merges, pushes or rewrites history; you review and merge the branch.
+- **Your code is taken as it is.** Old tests count as the baseline. RIL asks once whether you want stronger checks on any existing part. Skip it and it does not ask again.
+- **Stronger checks, whenever you ask.** Say "make the checks on X stronger" at any time. RIL writes down how X should behave (you confirm it), proves it, counts an existing test as proof only if it ran this session and the checker judged that it really tests the promise, and sends anything that fails through the usual fix rounds.
+- **What it touches.** The two-line RIL pointer in `CLAUDE.md` and `AGENTS.md` (created if missing), and `.ril/`, which git ignores. It adds to your README and `.gitignore`; it never replaces them or untracks your files. It asks first before migrations, dependency upgrades, CI changes, or files outside the area you named.
+- **Another job later.** Open the project and type `/ril` again. A new request after done is a new job.
+
 ## What happens
 
 The path is: idea, design, spec, plan, tasks, tests, build, proof, fixes, run, done.
