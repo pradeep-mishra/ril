@@ -11,7 +11,6 @@
 
 ## Evidence required for done
 
-- The README existed at the verified saved version.
 - `ril ledger summary`: every scenario proven at the current saved version, or "Accepted as unproven: <id>".
 - `final.md` has its traceability table and "What is not covered".
 - `ril stage set done` exited 0; or the project is parked with a stop report.

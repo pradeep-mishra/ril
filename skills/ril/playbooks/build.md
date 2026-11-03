@@ -24,4 +24,3 @@
 - A seal followed every tester; the last commit reported no protected change.
 - The last review says `must-fix: 0`, or each left is "Accepted risk for <id>" in `ril decision list`.
 - `git ls-files` lists no generated output.
-- Prove started at the current saved version.

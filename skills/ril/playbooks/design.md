@@ -18,6 +18,7 @@ Goal: before any code, the person reads a one-page brief and says "go". Takes sp
 ## Evidence required for done
 
 - The bundle review: no must-fix, or each an accepted risk; `ril scenario coverage` exits 0.
+- Each number in design.md is a scenario criterion or a named check in the verify command, or listed under `## Not covered`.
 - `ril unit list --kind plan` matches the plan files.
 - `ril preflight` reports all installed under the approved hash; `ril allowlist write --approved` succeeded.
 - The person said "go"; `ril stage get` says build.

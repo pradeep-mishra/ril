@@ -38,6 +38,7 @@ On `NOT ACCEPTED`, each `PROBLEM:` line names one thing to fix. Fix it with `/ri
 For every place the run needed a human, stalled, or needed an extra rule, add a row to the "Run log" in `docs/decisions.md`.
 Name the failure you saw, not a guess about its cause, and say what was changed. Add a new rule only for a failure that repeated.
 If a step above could not be done, say that in the log too.
+Also log how long the project's verify command takes and how many times it ran at one saved version (plan close, each verifier, each drift check). These two numbers decide whether verifiers should share one suite run.
 
 ## Compare runs (golden set)
 

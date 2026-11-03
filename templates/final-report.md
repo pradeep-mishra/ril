@@ -11,7 +11,7 @@
 ## What is not covered
 - How it was verified:
 - Assumptions:
-- Left out (including existing code RIL did not prove):
+- Left out (existing code RIL did not prove; design numbers with no check):
 - Accepted without proof (with stop reports):
 
 ## Decisions made for you

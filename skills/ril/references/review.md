@@ -21,4 +21,3 @@ A fresh reviewer, never the author, attacks the artifact.
 ## Evidence required for done
 
 - The last reply says `must-fix: 0`, or each must-fix left is a logged, disputed accepted risk the person knows.
-- The caller has that reply's path (a verifier's `--review` needs it).
